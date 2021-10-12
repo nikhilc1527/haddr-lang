@@ -8,12 +8,13 @@ import Data.Char
 data TokenType =
   -- tokens that take a single character
   TOK_USERDEF String    | -- a user defined function or variable name
-  TOK_LITERALINT Int    | -- literal (4 bytes)
+  TOK_LITERALNUM String | -- literal (4 bytes)
   TOK_CURLYBRACKETOPEN  | -- for defining value from a statement
   TOK_CURLYBRACKETCLOSE |
   TOK_PARENOPEN         | -- for function calls
   TOK_PARENCLOSE        |
-  TOK_EQUALS        |
+  TOK_EQUALS            |
+  TOK_SEMICOLON         |
   -- tokens that take multiple characters
   TOK_SYSCALL String    | -- for syscalls, use : and then name of syscall
   TOK_IF                | -- if statement
@@ -35,35 +36,37 @@ numTokens = do
 getTokens :: String -> [TokenType]
 getTokens [] = []
 getTokens (first_char:rest)
-  | isAlpha first_char || first_char == '_' = (TOK_USERDEF firstword):rest_words_tokens
-  | isDigit first_char = (TOK_LITERALINT firstnum):restnum
-  | isSpace first_char = rest_tokens
-  | first_char == ':' = (TOK_SYSCALL firstword):rest_words_tokens
-  | first_char == '&' = (TOK_ADDR firstword):rest_words_tokens
-  | first_char == '{' = TOK_CURLYBRACKETOPEN:rest_tokens
-  | first_char == '}' = TOK_CURLYBRACKETCLOSE:rest_tokens
-  | first_char == '(' = TOK_PARENOPEN:rest_tokens
-  | first_char == ')' = TOK_PARENCLOSE:rest_tokens
-  | first_char == '=' = TOK_EQUALS:rest_tokens
-  | first_char == 'i' && firstword == "f" = TOK_IF:rest_words_tokens
-  | first_char == 't' && firstword == "hen" = TOK_THEN:rest_words_tokens
-  | first_char == 'e' && firstword == "lse" = TOK_ELSE:rest_words_tokens
-  | first_char == 'e' && firstword == "nd" = TOK_END:rest_words_tokens
-  | first_char == '"' = (TOK_LITERALSTRING curstring):(getTokens afterstring)
+  | isAlpha first_char || first_char == '_'  = (TOK_USERDEF firstword):rest_words_tokens
+  | isDigit first_char                       = (TOK_LITERALNUM firstnum):restnum
+  | isSpace first_char                       = rest_tokens
+  | first_char == ':'                        = (TOK_SYSCALL firstword):rest_words_tokens
+  | first_char == '&'                        = (TOK_ADDR firstword):rest_words_tokens
+  | first_char == '{'                        = TOK_CURLYBRACKETOPEN:rest_tokens
+  | first_char == '}'                        = TOK_CURLYBRACKETCLOSE:rest_tokens
+  | first_char == '('                        = TOK_PARENOPEN:rest_tokens
+  | first_char == ')'                        = TOK_PARENCLOSE:rest_tokens
+  | first_char == ';'                        = TOK_SEMICOLON:rest_tokens
+  | first_char == '='                        = TOK_EQUALS:rest_tokens
+  | first_char == 'i' && firstword == "f"    = TOK_IF:rest_words_tokens
+  | first_char == 't' && firstword == "hen"  = TOK_THEN:rest_words_tokens
+  | first_char == 'e' && firstword == "lse"  = TOK_ELSE:rest_words_tokens
+  | first_char == 'e' && firstword == "nd"   = TOK_END:rest_words_tokens
+  | first_char == '"'                        = (TOK_LITERALSTRING curstring):(getTokens afterstring)  
+  | first_char == '.'                        = error "cannot have a period at the beginning of a number (use 0. if you want to represent a decimal"
+  | True                                     = error "you didnt implement lexer for all the token types\ntokenize error"
   where
-    word_separator = length $ takeWhile (\ x -> isAlpha x || x == '_') rest
-    num_separator = length $ takeWhile (isDigit) rest
+    word_separator     = length $ takeWhile (\ x -> isAlpha x || x == '_') rest
+    num_separator      = length $ takeWhile (\ x -> isDigit x || x == '.') rest
     
-    firstword = [first_char] ++ (take word_separator rest)
-    restwords = drop word_separator rest
+    firstword          = [first_char] ++ (take word_separator rest)
+    restwords          = drop word_separator rest
 
-    firstnum = read $ ([first_char] ++ (take num_separator rest))
-    restnum = getTokens $ drop num_separator rest
+    firstnum           = [first_char] ++ (take num_separator rest)
+    restnum            = getTokens $ drop num_separator rest
 
-    rest_tokens = getTokens rest
-    rest_words_tokens = getTokens restwords
+    rest_tokens        = getTokens rest
+    rest_words_tokens  = getTokens restwords
     
-    curstring = "\"" ++ takeWhile (/= '"') rest ++ "\""
-    afterstring = tail $ dropWhile (/= '"') rest
-
-getTokens _ = error "you didnt implement lexer for all the token types"
+    curstring          = "\"" ++ takeWhile (/= '"') rest ++ "\""
+    afterstring        = tail $ dropWhile (/= '"') rest
+ 

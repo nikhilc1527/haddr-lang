@@ -1,1 +1,1 @@
-:write(1, "hello world")
+:write(1 "hello world");

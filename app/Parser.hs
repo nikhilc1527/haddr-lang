@@ -69,13 +69,13 @@ parseL3 (TOK_LITERALNUM s:tokens_0) = Just (EXP_VALUE $ TOK_LITERALNUM s, tokens
 parseL3 (TOK_LITERALSTRING s:tokens_0) = Just (EXP_VALUE $ TOK_LITERALSTRING s, tokens_0)
 
 parseL3 tokens_0
-  | TOK_PARENOPEN <- head tokens_0 = case l1_1 of
+  | TOK_PARENCLOSE <- head tokens_0 = case l1_1 of
       EXP_EMPTY -> error "[ERROR]: parseL3: empty after open paren"
       _ -> if (null tokens_1) then error "[ERROR]: parseL3: empty after l1_1" else (case head tokens_1 of
-                                                   TOK_PARENCLOSE -> Just (l1_1, tail tokens_1)
+                                                   TOK_PARENOPEN -> Just (l1_1, tail tokens_1)
                                                    _ -> error "[ERROR]: parseL3: no closing paren after l1_1"
                                                 )
-  | True = error "[ERROR]: parseL3: non-exhaustive"
+  | True = error ("[ERROR]: parseL3: non-exhaustive: " ++ (show tokens_0))
   where
     (l1_1, tokens_1) = unwrap_maybe_exp $ parseL1 $ tail tokens_0
 

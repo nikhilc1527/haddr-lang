@@ -35,7 +35,8 @@ executable haddr-lang
                       readline,
                       containers
     other-modules:
-                      Lexer
-                      Parser
+                      Lexer,
+                      Parser,
+                      Interpreter
     hs-source-dirs:   app
     default-language: Haskell2010

@@ -8,9 +8,11 @@ import Data.Bool
 
 import Lexer
 import Parser
+import Interpreter
 
 process_text :: String -> String
-process_text text = printf "tokens --> %s\nstatement --> %s\nparse tree --> \n%s\n" (show tokens) (show statements) parse_tree_showed
+process_text text = printf "tokens --> %s\nstatement --> %s\nparse tree --> \n%s\ninterpreted value --> %s\n"
+                    (show tokens) (show statements) parse_tree_showed (show interpreted)
   where
     tokens = getTokens text
     statements = getStatements tokens
@@ -22,6 +24,13 @@ process_text text = printf "tokens --> %s\nstatement --> %s\nparse tree --> \n%s
     -- parse_tree_showed = unlines $ pretty_print 0 $ 
     --   lines $ concat $ map f $ show parse_tree
     parse_tree_showed = print_exp 0 parse_tree
+    interpreted = interpret_statement parse_tree
+    -- interp_showed = case interpreted of
+    --   VAL_STRING x -> show x
+    --   VAL_STRING x -> show x
+    --   VAL_BOOL   x -> show x
+    --   VAL_EMPTY    -> "empty value"
+    --   _            -> error "bad value"
 
 repl :: IO()
 repl = do

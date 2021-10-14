@@ -3,28 +3,35 @@ module Lexer where
 import Data.STRef
 import Control.Monad.ST
 import Data.Char
+import Text.Printf
 
 -- START_TOKENS
 data TokenType =
-  -- tokens that take a single character
+  -- non terminal tokens - will be used in the parser
   TOK_USERDEF String    | -- a user defined function or variable name
   TOK_LITERALNUM String | -- literal (4 bytes)
+  
+  -- tokens that take a single character
   TOK_CURLYBRACKETOPEN  | -- for defining value from a statement
   TOK_CURLYBRACKETCLOSE |
   TOK_PARENOPEN         | -- for function calls
   TOK_PARENCLOSE        |
   TOK_EQUALS            |
+  TOK_PLUS            |
+  TOK_MINUS            |
+  TOK_MULT            |
+  TOK_DIV            |
   TOK_SEMICOLON         |
   -- tokens that take multiple characters
   TOK_SYSCALL String    | -- for syscalls, use : and then name of syscall
   TOK_IF                | -- if statement
-  TOK_THEN              |
+  TOK_DO                |
   TOK_ELSE              |
   TOK_END               | -- keyword for ending a for or while
   TOK_ADDR String              | -- operator to get address of value (&)
   TOK_LITERALSTRING String -- literal string with ""
 -- END_TOKENS
-  deriving (Show)
+  deriving (Eq, Show)
 
 numTokens :: IO Int
 numTokens = do
@@ -47,13 +54,17 @@ getTokens (first_char:rest)
   | first_char == ')'                        = TOK_PARENCLOSE:rest_tokens
   | first_char == ';'                        = TOK_SEMICOLON:rest_tokens
   | first_char == '='                        = TOK_EQUALS:rest_tokens
+  | first_char == '+'                        = TOK_PLUS:rest_tokens
+  | first_char == '-'                        = TOK_MINUS:rest_tokens
+  | first_char == '*'                        = TOK_MULT:rest_tokens
+  | first_char == '/'                        = TOK_DIV:rest_tokens
   | first_char == 'i' && firstword == "f"    = TOK_IF:rest_words_tokens
-  | first_char == 't' && firstword == "hen"  = TOK_THEN:rest_words_tokens
+  | first_char == 'd' && firstword == "o"    = TOK_DO:rest_words_tokens
   | first_char == 'e' && firstword == "lse"  = TOK_ELSE:rest_words_tokens
   | first_char == 'e' && firstword == "nd"   = TOK_END:rest_words_tokens
   | first_char == '"'                        = (TOK_LITERALSTRING curstring):(getTokens afterstring)  
   | first_char == '.'                        = error "cannot have a period at the beginning of a number (use 0. if you want to represent a decimal"
-  | True                                     = error "you didnt implement lexer for all the token types\ntokenize error"
+  | True                                     = error $ printf "undefined token: %s" [first_char]
   where
     word_separator     = length $ takeWhile (\ x -> isAlpha x || x == '_') rest
     num_separator      = length $ takeWhile (\ x -> isDigit x || x == '.') rest

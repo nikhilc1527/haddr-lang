@@ -1,6 +1,6 @@
 #!/bin/sh
 
-cabal clean
+# cabal clean
 cabal build
 echo "----------------------------------------------------\n"
-./haddr-lang run test.haddr 
+./haddr-lang run test/test.haddr

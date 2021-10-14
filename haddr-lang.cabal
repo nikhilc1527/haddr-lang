@@ -32,7 +32,10 @@ executable haddr-lang
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
     build-depends:    base ^>=4.15.0.0,
-                      readline
-    
+                      readline,
+                      containers
+    other-modules:
+                      Lexer
+                      Parser
     hs-source-dirs:   app
     default-language: Haskell2010

@@ -4,15 +4,24 @@ import System.IO
 import System.Environment
 import qualified System.Console.Readline as RL
 import Text.Printf
+import Data.Bool
 
 import Lexer
 import Parser
 
 process_text :: String -> String
-process_text text = printf "tokens --> %s\nstatement --> %s\n" (show tokens) (show statements)
+process_text text = printf "tokens --> %s\nstatement --> %s\nparse tree --> \n%s\n" (show tokens) (show statements) parse_tree_showed
   where
     tokens = getTokens text
     statements = getStatements tokens
+    (parse_tree, tokens2) = unwrap_maybe_exp $ parseL1 $ reverse $ head statements
+    f x
+      | x == '(' = "\n(\n"
+      | x == ')' = "\n)"
+      | True = [x]
+    -- parse_tree_showed = unlines $ pretty_print 0 $ 
+    --   lines $ concat $ map f $ show parse_tree
+    parse_tree_showed = print_exp 0 parse_tree
 
 repl :: IO()
 repl = do

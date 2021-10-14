@@ -1,4 +1,0 @@
-:print 1 ("hello"; "world");
-a = 5;
-b = 10;
-c = add a b;

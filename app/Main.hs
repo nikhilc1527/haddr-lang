@@ -11,26 +11,18 @@ import Parser
 import Interpreter
 
 process_text :: String -> String
-process_text text = printf "tokens --> %s\nstatement --> %s\nparse tree --> \n%s\ninterpreted value --> %s\n"
-                    (show tokens) (show statements) parse_tree_showed (show interpreted)
+process_text text = printf "tokens --> %s\nstatement --> %s\nparse tree --> \n%s\ninterpreted value --> %s\ntokens not parsed --> %s"
+                    (show tokens) (show $ head statements) parse_tree_showed (show interpreted) (show tokens2)
   where
     tokens = getTokens text
     statements = getStatements tokens
-    (parse_tree, tokens2) = unwrap_maybe_exp $ parseL1 $ reverse $ head statements
+    (parse_tree, tokens2) = parseL1 $ head statements
     f x
       | x == '(' = "\n(\n"
       | x == ')' = "\n)"
       | True = [x]
-    -- parse_tree_showed = unlines $ pretty_print 0 $ 
-    --   lines $ concat $ map f $ show parse_tree
     parse_tree_showed = print_exp 0 parse_tree
     interpreted = interpret_statement parse_tree
-    -- interp_showed = case interpreted of
-    --   VAL_STRING x -> show x
-    --   VAL_STRING x -> show x
-    --   VAL_BOOL   x -> show x
-    --   VAL_EMPTY    -> "empty value"
-    --   _            -> error "bad value"
 
 repl :: IO()
 repl = do

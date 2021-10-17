@@ -16,13 +16,16 @@ process_text text = printf "tokens --> %s\nstatement --> %s\nparse tree --> \n%s
   where
     tokens = getTokens text
     statements = getStatements tokens
-    (parse_tree, tokens2) = parseL1 $ head statements
-    f x
-      | x == '(' = "\n(\n"
-      | x == ')' = "\n)"
-      | True = [x]
+    
+    (parse_tree, tokens2) = parseL0 $ head statements
     parse_tree_showed = print_exp 0 parse_tree
     interpreted = interpret_statement parse_tree
+    -- interpreted_stmts = map (\ stmt ->
+    --                      let
+    --                        (parse_tree, tokens2) = parseL0 $ stmt
+    --                        interpreted = interpreted_statement parse_tree
+    --                      in
+    --                        interpreted) statements
 
 repl :: IO()
 repl = do

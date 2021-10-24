@@ -19,6 +19,7 @@ data Value =
 -- interpret_statements :: [Expression] -> Value
 
 interpret_statement :: Expression -> Value
+-- interpret_statement (EXP_ASSIGNMENT lhs exp) = 
 interpret_statement (EXP_IF cond expr_true expr_false) =
   case cond_val of
     VAL_NUM value ->

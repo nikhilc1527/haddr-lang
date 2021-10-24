@@ -11,21 +11,14 @@ import Parser
 import Interpreter
 
 process_text :: String -> String
-process_text text = printf "tokens --> %s\nstatement --> %s\nparse tree --> \n%s\ninterpreted value --> %s\ntokens not parsed --> %s"
-                    (show tokens) (show $ head statements) parse_tree_showed (show interpreted) (show tokens2)
+process_text text = printf "tokens --> %s\nparse tree --> \n%s\ninterpreted value --> %s\n"
+                    (show tokens) parse_tree_showed (show interpreted)
   where
     tokens = getTokens text
-    statements = getStatements tokens
     
-    (parse_tree, tokens2) = parseL0 $ head statements
+    parse_tree = parseSource tokens
     parse_tree_showed = print_exp 0 parse_tree
     interpreted = interpret_statement parse_tree
-    -- interpreted_stmts = map (\ stmt ->
-    --                      let
-    --                        (parse_tree, tokens2) = parseL0 $ stmt
-    --                        interpreted = interpreted_statement parse_tree
-    --                      in
-    --                        interpreted) statements
 
 repl :: IO()
 repl = do

@@ -7,7 +7,6 @@ import Text.Printf
 import qualified Data.HashMap as Map
 import qualified Debug.Trace as Trace
 
--- START_TOKENS
 data TokenType =
   -- non terminal tokens - will be used in the parser
   TOK_USERDEF String    | -- a user defined function or variable name
@@ -22,6 +21,7 @@ data TokenType =
   TOK_MINUS             |
   TOK_MULT              |
   TOK_DIV               |
+  TOK_OPERATOR          |
   TOK_SEMICOLON         |
   -- tokens that take multiple characters
   TOK_SYSCALL String    | -- for syscalls, use : and then name of syscall
@@ -32,14 +32,7 @@ data TokenType =
   TOK_END               | -- keyword for ending a for or while
   TOK_ADDR String       | -- operator to get address of value (&)
   TOK_LITERALSTRING String -- literal string with ""
--- END_TOKENS
   deriving (Eq, Show)
-
-numTokens :: IO Int
-numTokens = do
-  let progName = "app/Lexer.hs"
-  tokens <- readFile progName >>= (return . drop 2 . takeWhile (\ x -> x /= "-- END_TOKENS") . dropWhile (\ x -> x /= "-- START_TOKENS") . lines)
-  return $ length tokens
 
 -- pass in the source code and get returned a list of all of the tokens
 getTokens :: String -> [TokenType]
@@ -58,14 +51,14 @@ getTokens (first_char:rest)
   | first_char == '-'                        = TOK_MINUS:rest_tokens
   | first_char == '*'                        = TOK_MULT:rest_tokens
   | first_char == '/'                        = TOK_DIV:rest_tokens
-  | first_char == 'i' && tail firstword == "f"    = Trace.traceShowId $ TOK_IF:rest_words_tokens
-  | first_char == 'w' && tail firstword == "hile" = TOK_WHILE:rest_words_tokens
-  | first_char == 'd' && tail firstword == "o"    = TOK_DO:rest_words_tokens
-  | first_char == 'e' && tail firstword == "lse"  = TOK_ELSE:rest_words_tokens
-  | first_char == 'e' && tail firstword == "nd"   = TOK_END:rest_words_tokens
+  | firstword == "if"                        = TOK_IF:rest_words_tokens
+  | firstword == "while"                     = TOK_WHILE:rest_words_tokens
+  | firstword == "do"                        = TOK_DO:rest_words_tokens
+  | firstword == "else"                      = TOK_ELSE:rest_words_tokens
+  | firstword == "end"                       = TOK_END:rest_words_tokens
   | first_char == '"'                        = (TOK_LITERALSTRING curstring):(getTokens afterstring)  
   | first_char == '.'                        = error "cannot have a period at the beginning of a number (use 0. if you want to represent a decimal"
-  | isAlpha first_char || first_char == '_'  = Trace.traceShowId $ (TOK_USERDEF firstword):rest_words_tokens
+  | isAlpha first_char || first_char == '_'  = (TOK_USERDEF firstword):rest_words_tokens
   | isDigit first_char                       = (TOK_LITERALNUM firstnum):restnum
   | True                                     = error $ printf "undefined token: %s" [first_char]
   where

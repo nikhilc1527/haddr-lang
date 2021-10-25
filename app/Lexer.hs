@@ -6,6 +6,7 @@ import Data.Char
 import Text.Printf
 import qualified Data.HashMap as Map
 import qualified Debug.Trace as Trace
+import Data.Hashable
 
 data TokenType =
   -- non terminal tokens - will be used in the parser
@@ -32,7 +33,7 @@ data TokenType =
   TOK_END               | -- keyword for ending a for or while
   TOK_ADDR String       | -- operator to get address of value (&)
   TOK_LITERALSTRING String -- literal string with ""
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 -- pass in the source code and get returned a list of all of the tokens
 getTokens :: String -> [TokenType]

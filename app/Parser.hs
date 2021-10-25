@@ -5,6 +5,7 @@ import Lexer
 import Data.Bool
 import Data.Data
 import qualified Debug.Trace as Trace
+import Data.Hashable
 
 data Expression =
   EXP_IF Expression Expression Expression              | -- if expression then expression else expression
@@ -20,35 +21,36 @@ data Expression =
   EXP_ASSIGNMENT Expression Expression                 | -- the assignment is an expression on one side (could be either just a variable name or could be a function type)
   EXP_SRCBLOCK [Expression]                            | -- a list of expressions that are part of one bigger block of code
   EXP_INVALID
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 print_exp :: Int -> Expression -> String
-print_exp spaces (EXP_IF cond e1 e2) = (take spaces $ repeat ' ') ++ "IF\n"  ++ (print_exp (spaces+2) cond) ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-print_exp spaces (EXP_PLUS e1 e2)    = (take spaces $ repeat ' ') ++ "PLUS\n"  ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-print_exp spaces (EXP_MINUS e1 e2)   = (take spaces $ repeat ' ') ++ "MINUS\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-print_exp spaces (EXP_MULT e1 e2)    = (take spaces $ repeat ' ') ++ "MULT\n"  ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-print_exp spaces (EXP_DIV e1 e2)     = (take spaces $ repeat ' ') ++ "DIV\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-print_exp spaces (EXP_ASSIGNMENT tokens1 e2)     = (take spaces $ repeat ' ') ++ "ASSIGNMENT\n"   ++ (print_exp (spaces+2) tokens1) ++ (print_exp (spaces+2) e2)
-print_exp spaces (EXP_LHS t1)        = (take spaces $ repeat ' ') ++ (show t1) ++ "\n"
-print_exp spaces (EXP_VALUE t1)      = (take spaces $ repeat ' ') ++ (show t1) ++ "\n"
-print_exp spaces (EXP_SRCBLOCK blk)  = (take spaces $ repeat ' ') ++ "SOURCE BLOCK\n" ++ (foldl (++) "" $ map (print_exp (spaces+2)) blk)
-print_exp spaces (EXP_INVALID)       = (take spaces $ repeat ' ') ++ "INVALID EXPR" ++ "\n"
-print_exp spaces _                   = error "could not identify type of expression while printing"
+print_exp spaces (EXP_IF cond e1 e2)     = (take spaces $ repeat ' ') ++ "IF\n"  ++ (print_exp (spaces+2) cond) ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+print_exp spaces (EXP_PLUS e1 e2)        = (take spaces $ repeat ' ') ++ "PLUS\n"  ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+print_exp spaces (EXP_MINUS e1 e2)       = (take spaces $ repeat ' ') ++ "MINUS\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+print_exp spaces (EXP_MULT e1 e2)        = (take spaces $ repeat ' ') ++ "MULT\n"  ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+print_exp spaces (EXP_DIV e1 e2)         = (take spaces $ repeat ' ') ++ "DIV\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+print_exp spaces (EXP_ASSIGNMENT lhs e2) = (take spaces $ repeat ' ') ++ "ASSIGNMENT\n" ++ (print_exp (spaces+2) lhs) ++ (print_exp (spaces+2) e2)
+print_exp spaces (EXP_LHS t1)            = (take spaces $ repeat ' ') ++ (show t1) ++ "\n"
+print_exp spaces (EXP_VALUE t1)          = (take spaces $ repeat ' ') ++ (show t1) ++ "\n"
+print_exp spaces (EXP_SRCBLOCK blk)      = (take spaces $ repeat ' ') ++ "SOURCE BLOCK\n" ++ (foldl (++) "" $ map (print_exp (spaces+2)) blk)
+print_exp spaces (EXP_INVALID)           = (take spaces $ repeat ' ') ++ "INVALID EXPR" ++ "\n"
+print_exp spaces _                       = error "could not identify type of expression while printing"
 
 invalid_parse = (EXP_INVALID, [])
-
--- level -1: 
--- parseLM1 :: [TokenType] -> (Expression, [TokenType])
-
 
 parseL0 :: [TokenType] -> (Expression, [TokenType]) -- returns maybe a syntax tree of expression or nothing if couldnt parse, and if could parse then the 
 parseL0 [] = invalid_parse
 parseL0 tokens
-  | TOK_EQUALS `elem` tokens = (EXP_ASSIGNMENT (EXP_LHS beforeEq) afterEqExp, tokens_1)
+  | TOK_EQUALS `elem` tokens && lhs_all_userdef = ((EXP_ASSIGNMENT (EXP_LHS beforeEq) afterEqExp), tokens_1)
+  | TOK_EQUALS `elem` tokens                    = error "not all userdefs before assignment operator"
   where
     beforeEq = takeWhile (/= TOK_EQUALS) tokens
+    lhs_all_userdef = foldl (&&) True (map (\x ->
+                                              case x of
+                                                TOK_USERDEF a -> True
+                                                _ -> False) beforeEq)
     afterEq  = tail $ dropWhile (/= TOK_EQUALS) tokens
-    (afterEqExp, tokens_1) = parseL3 afterEq
+    (afterEqExp, tokens_1) = parseL0 afterEq
 parseL0 (TOK_IF:tokens_0)
   | cond_1 == EXP_INVALID = invalid_parse
   | tokens_1 == [] = invalid_parse

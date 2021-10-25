@@ -5,6 +5,7 @@ import System.Environment
 import qualified System.Console.Readline as RL
 import Text.Printf
 import Data.Bool
+import qualified Data.Map as Map
 
 import Lexer
 import Parser
@@ -18,7 +19,7 @@ process_text text = printf "tokens --> %s\nparse tree --> \n%s\ninterpreted valu
     
     parse_tree = parseSource tokens
     parse_tree_showed = print_exp 0 parse_tree
-    interpreted = interpret_statement parse_tree
+    interpreted = interpret_block Map.empty parse_tree
 
 repl :: IO()
 repl = do

@@ -19,7 +19,7 @@ process_text text = printf "tokens --> %s\nparse tree --> \n%s\ninterpreted valu
     
     parse_tree = parseSource tokens
     parse_tree_showed = print_exp 0 parse_tree
-    interpreted = interpret_block Map.empty parse_tree
+    (symtab, interpreted) = interpret_block Map.empty parse_tree
 
 repl :: IO()
 repl = do

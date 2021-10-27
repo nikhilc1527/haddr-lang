@@ -22,6 +22,7 @@ data TokenType =
   TOK_MINUS             |
   TOK_MULT              |
   TOK_DIV               |
+  TOK_MOD               |
   TOK_OPERATOR          |
   TOK_SEMICOLON         |
   -- tokens that take multiple characters
@@ -52,6 +53,7 @@ getTokens (first_char:rest)
   | first_char == '-'                        = TOK_MINUS:rest_tokens
   | first_char == '*'                        = TOK_MULT:rest_tokens
   | first_char == '/'                        = TOK_DIV:rest_tokens
+  | first_char == '%'                        = TOK_MOD:rest_tokens
   | firstword == "if"                        = TOK_IF:rest_words_tokens
   | firstword == "while"                     = TOK_WHILE:rest_words_tokens
   | firstword == "do"                        = TOK_DO:rest_words_tokens

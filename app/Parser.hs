@@ -88,6 +88,30 @@ parseL0 ((TOK_USERDEF x):tokens)
     (afterEqExp, tokens_1) = parseL0 afterEq
 parseL0 tokens = parseL1 $ tokens
 
+-- takes [(operator token, operator expression)] 
+operatorParser :: [(TokenType, Expression -> Expression -> Expression)] -> ([TokenType] -> (Expression, [TokenType])) -> [TokenType] -> (Expression, [TokenType])
+operatorParser operators next_parser [] = invalid_parse
+operatorParser operators next_parser tokens_0
+  | np_1 == EXP_INVALID = invalid_parse
+  | null tokens_1       = (np_1, tokens_1)
+  | True                = get_all_ops np_1 tokens_1
+  where
+    -- np == next_parser
+    (np_1, tokens_1) = next_parser tokens_0
+
+    get_all_ops :: Expression -> [TokenType] -> (Expression, [TokenType])
+    get_all_ops prev_exp [] = (prev_exp, [])
+    get_all_ops prev_exp rest_tokens =
+      let
+        (np_2, tokens_2) = next_parser $ tail rest_tokens
+        mapper :: (TokenType, Expression -> Expression -> Expression) -> Expression
+        mapper (token, expression) = bool EXP_INVALID (expression prev_exp np_2) (head rest_tokens == token)
+        mapped = map mapper operators
+        abc :: [Expression]
+        abc = filter (/= EXP_INVALID) $ mapped
+      in
+        bool (head abc, tokens_2) (prev_exp, rest_tokens) (null abc)
+
 parseL1 :: [TokenType] -> (Expression, [TokenType])
 parseL1 [] = invalid_parse
 parseL1 tokens_0

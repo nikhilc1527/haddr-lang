@@ -23,6 +23,10 @@ data TokenType =
   TOK_MULT              |
   TOK_DIV               |
   TOK_MOD               |
+  TOK_LT                |
+  TOK_GT                |
+  TOK_AND               |
+  TOK_OR                |
   TOK_OPERATOR          |
   TOK_SEMICOLON         |
   -- tokens that take multiple characters
@@ -54,11 +58,15 @@ getTokens (first_char:rest)
   | first_char == '*'                        = TOK_MULT:rest_tokens
   | first_char == '/'                        = TOK_DIV:rest_tokens
   | first_char == '%'                        = TOK_MOD:rest_tokens
-  | firstword == "if"                        = TOK_IF:rest_words_tokens
-  | firstword == "while"                     = TOK_WHILE:rest_words_tokens
-  | firstword == "do"                        = TOK_DO:rest_words_tokens
-  | firstword == "else"                      = TOK_ELSE:rest_words_tokens
-  | firstword == "end"                       = TOK_END:rest_words_tokens
+  | first_char == '<'                        = TOK_LT:rest_tokens
+  | first_char == '>'                        = TOK_GT:rest_tokens
+  | firstword  == "&&"                       = TOK_AND:rest_words_tokens
+  | firstword  == "||"                       = TOK_OR:rest_words_tokens
+  | firstword  == "if"                       = TOK_IF:rest_words_tokens
+  | firstword  == "while"                    = TOK_WHILE:rest_words_tokens
+  | firstword  == "do"                       = TOK_DO:rest_words_tokens
+  | firstword  == "else"                     = TOK_ELSE:rest_words_tokens
+  | firstword  == "end"                      = TOK_END:rest_words_tokens
   | first_char == '"'                        = (TOK_LITERALSTRING curstring):(getTokens afterstring)  
   | first_char == '.'                        = error "cannot have a period at the beginning of a number (use 0. if you want to represent a decimal"
   | isAlpha first_char || first_char == '_'  = (TOK_USERDEF firstword):rest_words_tokens

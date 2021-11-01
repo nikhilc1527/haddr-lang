@@ -32,19 +32,19 @@ expID_SRCBLOCK = 16
 
 print_exp :: Int -> Expression -> String
 print_exp spaces (Expression exprID exprs tokens)
-  | exprID == expID_IF          = (take spaces $ repeat ' ') ++ "IF\n"  ++ (print_exp (spaces+2) cond) ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-  | exprID == expID_WHILE       = (take spaces $ repeat ' ') ++ "WHILE\n"  ++ (print_exp (spaces+2) cond) ++ (print_exp (spaces+2) e1)
-  | exprID == expID_PLUS        = (take spaces $ repeat ' ') ++ "PLUS\n"  ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-  | exprID == expID_MINUS       = (take spaces $ repeat ' ') ++ "MINUS\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-  | exprID == expID_MULT        = (take spaces $ repeat ' ') ++ "MULT\n"  ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-  | exprID == expID_DIV         = (take spaces $ repeat ' ') ++ "DIV\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-  | exprID == expID_MOD         = (take spaces $ repeat ' ') ++ "MOD\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-  | exprID == expID_LT          = (take spaces $ repeat ' ') ++ "LT\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-  | exprID == expID_GT          = (take spaces $ repeat ' ') ++ "GT\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-  | exprID == expID_ASSIGNMENT  = (take spaces $ repeat ' ') ++ "ASSIGNMENT\n" ++ (print_exp (spaces+2) lhs) ++ (print_exp (spaces+2) e2)
-  | exprID == expID_LHS         = (take spaces $ repeat ' ') ++ (show t1) ++ "\n"
-  | exprID == expID_VALUE       = (take spaces $ repeat ' ') ++ (show t1) ++ "\n"
-  | exprID == expID_SRCBLOCK    = (take spaces $ repeat ' ') ++ "SOURCE BLOCK\n" ++ (foldl (++) "" $ map (print_exp (spaces+2)) blk)
+  | exprID == expID_IF          = let (cond:e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "IF\n"  ++ (print_exp (spaces+2) cond) ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+  | exprID == expID_WHILE       = let (cond:e1:[]) = exprs in (take spaces $ repeat ' ') ++ "WHILE\n"  ++ (print_exp (spaces+2) cond) ++ (print_exp (spaces+2) e1)
+  | exprID == expID_PLUS        = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "PLUS\n"  ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+  | exprID == expID_MINUS       = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "MINUS\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+  | exprID == expID_MULT        = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "MULT\n"  ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+  | exprID == expID_DIV         = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "DIV\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+  | exprID == expID_MOD         = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "MOD\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+  | exprID == expID_LT          = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "LT\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+  | exprID == expID_GT          = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "GT\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+  | exprID == expID_ASSIGNMENT  = let (lhs:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "ASSIGNMENT\n" ++ (print_exp (spaces+2) lhs) ++ (print_exp (spaces+2) e2)
+  | exprID == expID_LHS         = let (t1:[]) = tokens in (take spaces $ repeat ' ') ++ (show t1) ++ "\n"
+  | exprID == expID_VALUE       = let (t1:[]) = tokens in (take spaces $ repeat ' ') ++ (show t1) ++ "\n"
+  | exprID == expID_SRCBLOCK    = let (blk:[]) = exprs in (take spaces $ repeat ' ') ++ "SOURCE BLOCK\n" ++ (foldl (++) "" $ map (print_exp (spaces+2)) exprs)
   | exprID == expID_INVALID     = "\n" ++ (take spaces $ repeat ' ') ++ "--- INVALID EXPR ---\n" ++ "\n"
   | True                        = error "could not identify type of expression while printing"
 

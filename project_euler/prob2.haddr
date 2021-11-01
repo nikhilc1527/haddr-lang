@@ -1,0 +1,17 @@
+a = 1;
+b = 2;
+c = 3;
+sum = 0;
+while a < 4000000
+do
+  a = b;
+  b = c;
+  c = a + b;
+  if a % 2
+  do
+    0
+  else
+    sum = sum + a;
+  end;
+end;
+sum;

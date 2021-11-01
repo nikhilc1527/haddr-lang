@@ -1,0 +1,25 @@
+target = 600851475143;
+sqrt = 775146+1;
+sqrtsqrt = 881;
+largest = 0;
+i = 1;
+while i < sqrt
+do
+  isprime = 1;
+  j = 1;
+  while j < sqrtsqrt
+  do
+    if i % j
+    do 0
+    else
+      isprime = 0;
+    end;
+  end;
+  if isprime
+  do
+    largest = i;
+  else
+  end;
+  i = i + 1;
+end;
+largest

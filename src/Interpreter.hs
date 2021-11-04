@@ -2,6 +2,7 @@ module Interpreter where
 
 import qualified Data.Map as Map
 import qualified Data.STRef as STRef
+import qualified Control.Monad.ST as ST
 import qualified Debug.Trace as Trace
 import Data.Bool
 
@@ -67,7 +68,11 @@ interpret_statement (Expression expID exprs tokens) symbolTable
         (_, exp_interp) = interpret_statement exp symbolTable
         val_or_func = (length tokens) == 1 -- if theres only one token in the lhs, then its a variable, otherwise its a function
         typeID = 0 -- TODO: find out type id from all the types inside of exp
-        symbolTable2 = Map.insert (Expression expID_LHS [] tokens) (typeID, val_or_func, exp_interp, exp) $ Map.delete (Expression expID_LHS [] tokens) symbolTable
+        symbolTable2 = ST.runST $ do
+          ref <- STRef.newSTRef symbolTable
+          STRef.modifySTRef ref (Map.delete (Expression expID_LHS [] tokens))
+          STRef.modifySTRef ref (Map.insert (Expression expID_LHS [] tokens) (typeID, val_or_func, exp_interp, exp))
+          STRef.readSTRef ref
       in
         (symbolTable2, exp_interp)
   | expID == expID_IF =

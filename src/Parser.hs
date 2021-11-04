@@ -41,6 +41,8 @@ print_exp spaces (Expression exprID exprs tokens)
   | exprID == expID_MOD         = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "MOD\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
   | exprID == expID_LT          = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "LT\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
   | exprID == expID_GT          = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "GT\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+  | exprID == expID_AND         = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "AND\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+  | exprID == expID_OR          = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "OR\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
   | exprID == expID_ASSIGNMENT  = let (lhs:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "ASSIGNMENT\n" ++ (print_exp (spaces+2) lhs) ++ (print_exp (spaces+2) e2)
   | exprID == expID_LHS         = let (t1:[]) = tokens in (take spaces $ repeat ' ') ++ (show t1) ++ "\n"
   | exprID == expID_VALUE       = let (t1:[]) = tokens in (take spaces $ repeat ' ') ++ (show t1) ++ "\n"
@@ -126,9 +128,9 @@ operatorParser operators next_parser tokens_0
       in
         bool ((Expression exprID [prev_exp, np_2] []), tokens_2) (prev_exp, rest_tokens) (null operatorMatch)
 
-parseL1 = operatorParser [(TOK_LT, expID_LT), (TOK_GT, expID_GT)] parseL2
+parseL1 = operatorParser [(TOK_AND, expID_AND), (TOK_OR, expID_OR)] parseL2
 
-parseL2 = operatorParser [(TOK_AND, expID_AND), (TOK_OR, expID_OR)] parseL3
+parseL2 = operatorParser [(TOK_LT, expID_LT), (TOK_GT, expID_GT)] parseL3
 
 parseL3 = operatorParser [(TOK_PLUS, expID_PLUS), (TOK_MINUS, expID_MINUS)] parseL4
 

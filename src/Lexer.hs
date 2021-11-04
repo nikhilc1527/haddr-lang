@@ -46,7 +46,6 @@ getTokens [] = []
 getTokens (first_char:rest)
   | isSpace first_char                       = rest_tokens
   | first_char == ':'                        = (TOK_SYSCALL firstword):rest_words_tokens
-  | first_char == '&'                        = (TOK_ADDR firstword):rest_words_tokens
   | first_char == '{'                        = TOK_CURLYBRACKETOPEN:rest_tokens
   | first_char == '}'                        = TOK_CURLYBRACKETCLOSE:rest_tokens
   | first_char == '('                        = TOK_PARENOPEN:rest_tokens
@@ -60,8 +59,9 @@ getTokens (first_char:rest)
   | first_char == '%'                        = TOK_MOD:rest_tokens
   | first_char == '<'                        = TOK_LT:rest_tokens
   | first_char == '>'                        = TOK_GT:rest_tokens
-  | firstword  == "&&"                       = TOK_AND:rest_words_tokens
-  | firstword  == "||"                       = TOK_OR:rest_words_tokens
+  | firstsep   == "&&"                       = TOK_AND:after_space_tokens
+  | firstsep   == "||"                       = TOK_OR:after_space_tokens
+  | first_char == '&'                        = (TOK_ADDR firstword):rest_words_tokens
   | firstword  == "if"                       = TOK_IF:rest_words_tokens
   | firstword  == "while"                    = TOK_WHILE:rest_words_tokens
   | firstword  == "do"                       = TOK_DO:rest_words_tokens
@@ -73,6 +73,10 @@ getTokens (first_char:rest)
   | isDigit first_char                       = (TOK_LITERALNUM firstnum):restnum
   | True                                     = error $ printf "undefined token: %s" [first_char]
   where
+    space_sep = length $ takeWhile (/= ' ') rest
+    firstsep = [first_char] ++ (take space_sep rest)
+    after_space_tokens = getTokens $ drop space_sep rest
+    
     word_separator     = length $ takeWhile (\ x -> isAlpha x || x == '_') rest
     num_separator      = length $ takeWhile (\ x -> isDigit x || x == '.') rest
     

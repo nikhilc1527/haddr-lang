@@ -2,7 +2,7 @@ a = 1;
 b = 2;
 c = 3;
 sum = 0;
-while a < 4000000
+while a < 400000
 do
   a = b;
   b = c;

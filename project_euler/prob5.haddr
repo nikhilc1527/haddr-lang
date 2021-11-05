@@ -1,0 +1,15 @@
+i = 1;
+lcm = 1;
+while i < 21 do
+      a = lcm;
+      b = i;
+      R = a % b;
+      while (a % b > 0) do
+            R = a % b;
+            a = b;
+            b = R;
+      end; 
+      lcm = i * lcm / b;
+      i = i + 1;
+end;
+lcm

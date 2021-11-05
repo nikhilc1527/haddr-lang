@@ -1,0 +1,24 @@
+largest = 0;
+i = 100;
+while i < 1000 do
+  j = 100;
+  while j < 1000
+  do
+    product = i * j;
+    reverse = 0;
+    while product do
+      reverse = reverse * 10;
+      reverse = reverse + product % 10;
+      product = product / 10;
+    end;
+    product = i * j;
+    if (product - reverse) do 0 else
+      if (product > largest) do
+        largest = product;
+      else end;
+    end;
+    j = j + 1;
+  end;
+  i = i + 1;
+end;
+largest

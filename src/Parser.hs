@@ -6,10 +6,15 @@ import Data.Bool
 import Data.Data
 import qualified Debug.Trace as Trace
 import Data.Hashable
+import Text.Printf
+
+instance Show Expression
+  where
+    show (Expression id exprs toks) = printf "(%d %s)" id $ bool (show exprs) (show $ head toks) $ length toks > 0
 
 type ExprID = Int
 data Expression = Expression ExprID [Expression] [TokenType]
-  deriving (Eq, Show, Ord)
+  deriving (Eq, Ord)
 
 expID_INVALID = -1
 expID_IF = 0
@@ -110,23 +115,25 @@ parseL0 tokens = parseL1 $ tokens
 operatorParser :: [(TokenType, ExprID)] -> ([TokenType] -> (Expression, [TokenType])) -> [TokenType] -> (Expression, [TokenType])
 operatorParser operators next_parser [] = invalid_parse
 operatorParser operators next_parser tokens_0
-  | np_1_id == expID_INVALID = invalid_parse
+  | np_1_id == expID_INVALID = Trace.trace "getting invalid parse from next parse" $ invalid_parse
   | null tokens_1       = (np_1, tokens_1)
   | True                = get_all_ops np_1 tokens_1
   where
     -- np == next_parser
     (np_1, tokens_1) = next_parser tokens_0
     (Expression np_1_id _ _) = np_1
-
     get_all_ops :: Expression -> [TokenType] -> (Expression, [TokenType])
     get_all_ops prev_exp [] = (prev_exp, [])
     get_all_ops prev_exp rest_tokens =
       let
         (np_2, tokens_2) = next_parser $ tail rest_tokens
+        
         operatorMatch = filter (\ (token, exprID) -> head rest_tokens == token) operators
         exprID = let (tokentype, expr) = head operatorMatch in expr
+        resultExp = Expression exprID [prev_exp, np_2] []
+        rest_ops = get_all_ops resultExp tokens_2
       in
-        bool ((Expression exprID [prev_exp, np_2] []), tokens_2) (prev_exp, rest_tokens) (null operatorMatch)
+        bool rest_ops (prev_exp, rest_tokens) (null operatorMatch)
 
 parseL1 = operatorParser [(TOK_AND, expID_AND), (TOK_OR, expID_OR)] parseL2
 
@@ -159,8 +166,7 @@ parseSource :: [TokenType] -> Expression
 parseSource [] = Expression expID_SRCBLOCK [] []
 parseSource tokens
   | not $ null rest_first_tokens = error ("could not parse source " ++ (show first_stmt))
-  | True = -- Trace.trace ("parsing source block of: " ++ show tokens) $ 
-    Expression expID_SRCBLOCK (first_expr:exprs) []
+  | True = Expression expID_SRCBLOCK (first_expr:exprs) []
   where
     (first_stmt, rest_tokens) = nextStatement tokens
     (first_expr, rest_first_tokens) = parseL0 (first_stmt)

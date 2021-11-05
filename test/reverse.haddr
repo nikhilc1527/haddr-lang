@@ -1,0 +1,8 @@
+i = 12345;
+reverse = 0;
+while i do
+  reverse = reverse * 10;
+  reverse = reverse + i % 10;
+  i = i / 10;
+end;
+reverse

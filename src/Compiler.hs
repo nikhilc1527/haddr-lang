@@ -8,10 +8,10 @@ type ASMText = [Either String (String, [String])]
 -- compileSource = undefined
 
 type Symbol = (TypeID, String, Int)
-type SymbolTable = Map.Map Expression (
+type SymbolTable = Map.Map Expression 
 
 compileASM :: ASM -> String
-compileASM 
+compileASM = undefined
 
 exprToASM :: Expression -> ASM
-exprToASM 
+exprToASM = undefined

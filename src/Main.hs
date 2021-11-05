@@ -2,7 +2,6 @@ module Main where
 
 import System.IO
 import System.Environment
-import qualified System.Console.Readline as RL
 import Text.Printf
 import Data.Bool
 import qualified Data.Map as Map
@@ -21,20 +20,26 @@ process_text text = printf "tokens --> %s\nparse tree --> \n%s\ninterpreted valu
     parse_tree_showed = print_exp 0 parse_tree
     (symtab, interpreted) = interpret_block Map.empty parse_tree
 
+-- if you want a nice repl experience use the readline library wrapper https://github.com/hanslub42/rlwrap
 repl :: IO()
 repl = do
-  maybeLine <- RL.readline "% "
-  case maybeLine of
-    Nothing     -> return () -- EOF / control-d
-    Just "exit" -> return ()
-    Just line -> do
-      let output = process_text line
-      putStr output
-      repl
+  putStr "haddr >>> "
+  hFlush stdout
+  eof <- hIsEOF stdin
+  if eof then putStrLn "\nexit"
+    else do
+      line <- getLine
+      case line of
+        "exit"      -> return ()
+        "" -> repl
+        _ -> do
+          let output = process_text line
+          putStr output
+          repl
 
 processArgs :: [String] -> IO ()
 processArgs args
-  | length args == 0 = error "need at least one subcommand out of repl or interpreter"
+  | length args == 0 = putStrLn "need at least one subcommand out of repl or interpreter"
   | args !! 0 == "repl" = repl
   | args !! 0 == "run" = do
       fileHandle <- openFile (args !! 1) ReadMode

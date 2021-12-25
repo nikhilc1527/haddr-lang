@@ -31,14 +31,19 @@ executable haddr-lang
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
-    build-depends:    base ^>=4.15.0.0,
+    build-depends:    base,
                       readline,
                       containers >= 0.3,
                       hashable >= 1.3.4.1,
-                      hashmap
+                      hashmap,
+                      process,
+                      array
     other-modules:
                       Lexer,
                       Parser,
-                      Interpreter
+                      Interpreter,
+                      Compiler,
+                      Split
     hs-source-dirs:   src
     default-language: Haskell2010
+    default-extensions: "BangPatterns","MultiWayIf"

@@ -1,0 +1,7 @@
+func print num_one num_two do
+     a = num_one + num_two;
+     . a;
+     0
+end;
+
+print (3+4, 10+10)

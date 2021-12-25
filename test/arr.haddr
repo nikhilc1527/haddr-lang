@@ -1,0 +1,9 @@
+fibs = [20];
+fibs[0] = 0;
+fibs[1] = 1;
+N = 2;
+while N < 20 do
+      fibs[N] = fibs[N-1] + fibs[N-2];
+      N = N + 1;
+end;
+. fibs;

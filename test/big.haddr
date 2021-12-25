@@ -1,0 +1,7 @@
+sum = 0;
+i = 0;
+while i < 100000 do
+  sum = sum + i;
+  i = i + 1;
+end;
+. sum;

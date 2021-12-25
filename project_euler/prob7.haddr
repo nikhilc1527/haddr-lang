@@ -1,0 +1,24 @@
+func isprime i do
+      res = 1;
+      j = 2;
+      while j < i && res do
+            if i % j do 0
+            else
+                res = 0;
+            end;
+            j = j + 1;
+      end;
+      res
+end;
+
+i = 2;
+N = 10001;
+while N > 0 do
+      is = isprime(i);
+      if is do
+         N = N - 1;
+      else end;
+      i = i + 1;
+      if N % 100 do else . N end;
+end;
+0

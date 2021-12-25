@@ -1,0 +1,41 @@
+PRIME_LENGTH = 100000;
+primes = [PRIME_LENGTH];
+
+func print_arr arr arr_len do
+   i = 0;
+   while i < arr_len do
+      . arr[i];
+      . 10000000;
+      i = i + 1;
+   end;
+end;
+
+N = 0;
+while N < PRIME_LENGTH do
+    primes[N] = 1;
+    N = N + 1;
+end;
+N = 2;
+while N < PRIME_LENGTH do
+    if N < PRIME_LENGTH do
+    if primes[N] do
+       . N;
+        j = N * 2;
+       print_arr(primes, PRIME_LENGTH);
+        while j < PRIME_LENGTH do
+            primes[j] = 0;
+            j = j + N;
+        end;
+    else end;
+    else end;
+    N = N + 1;
+end;
+
+i = 0;
+   while i < PRIME_LENGTH do
+      . i;
+      . primes[i];
+      i = i + 1;
+   end;
+
+0

@@ -1,0 +1,18 @@
+max = 100;
+
+sum_of_squares = 0;
+
+i = 1;
+while i < max + 1 do
+      sum_of_squares = sum_of_squares + i * i;
+      i = i + 1;
+end;
+
+square_of_sum = 0;
+i = 1;
+while i < max + 1 do
+      square_of_sum = square_of_sum + i;
+      i = i + 1;
+end;
+square_of_sum = square_of_sum * square_of_sum;
+. square_of_sum - sum_of_squares;

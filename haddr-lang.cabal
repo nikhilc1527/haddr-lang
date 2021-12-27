@@ -37,7 +37,8 @@ executable haddr-lang
                       hashable >= 1.3.4.1,
                       hashmap,
                       process,
-                      array
+                      array,
+                      vector
     other-modules:
                       Lexer,
                       Parser,

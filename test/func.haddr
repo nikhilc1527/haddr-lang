@@ -1,7 +1,18 @@
-func print num_one num_two do
-     a = num_one + num_two;
-     . a;
-     0
+func plus_one arr arr_len do
+     i = 0;
+     while i < arr_len do
+           arr[i] = arr[i] + 1;
+           i = i + 1;
+     end;
+     arr
 end;
 
-print (3+4, 10+10)
+arr = [20];
+i = 0;
+while i < 20 do
+      arr[i] = i;
+      i = i + 1;
+end;
+. arr; . 10;
+arr = plus_one(arr, 20);
+. arr; . 10;

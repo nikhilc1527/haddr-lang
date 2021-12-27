@@ -1,0 +1,12 @@
+func f_one a do
+     a + 1
+end;
+
+func f_two a do a + 2 end;
+
+func apply f a do
+     f(a);
+end;
+
+. apply(f_one, 1);
+. apply(f_two, 1);

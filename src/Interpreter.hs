@@ -1,12 +1,14 @@
 module Interpreter where
 
 import qualified Data.Map as Map
-import qualified Data.Array as Arr
+import qualified Data.Vector as Vec
+import qualified Data.Vector.Mutable as MVec
 import qualified Data.STRef as STRef
 import qualified Control.Monad.ST as ST
 import qualified Debug.Trace as Trace
 import System.IO.Unsafe -- for unsafe printing
 import Data.Bool
+import Data.Char
 
 import Lexer
 import Parser
@@ -15,7 +17,7 @@ data Value =
   VAL_NUM Integer |
   VAL_STRING String |
   VAL_BOOL Bool |
-  VAL_ARR (Arr.Array Integer Value) |
+  VAL_ARR (Vec.Vector Value) |
   VAL_EMPTY
   deriving (Eq, Show)
 
@@ -31,7 +33,7 @@ interpret_block symbolTable (Expression expID exprs tokens)
   | length exprs == 1 =
     let
       cur = head exprs
-      (symbolTable2, val) = interpret_statement cur symbolTable
+      !(symbolTable2, val) = interpret_statement cur symbolTable
     in (symbolTable2, val)
   | True =
     let
@@ -86,11 +88,18 @@ interpret_statement (Expression expID exprs tokens) symbolTable
         typeID = 0 -- TODO: find out type id from all the types inside of exp
         maybe_arr = Map.lookup (Expression expID_LHS [] tokens) symbolTable3
         (_, _, VAL_ARR prev_arr, _) = maybe (error "array doesnt exist, cannot assign values into it yet") id maybe_arr
-        new_arr = prev_arr Arr.// [(ind_val, exp_interp)]
+        -- new_arr = prev_arr Arr.// [(ind_val, exp_interp)]
+        update_vec = Vec.modify (\v -> MVec.write v (fromInteger ind_val) exp_interp)
+        key = (Expression expID_LHS [] tokens)
         symbolTable4 = ST.runST $ do
           ref <- STRef.newSTRef symbolTable3
-          STRef.modifySTRef ref (Map.delete (Expression expID_LHS [] tokens))
-          STRef.modifySTRef ref (Map.insert (Expression expID_LHS [] tokens) (typeID, val_or_func, VAL_ARR new_arr, exp))
+          -- STRef.modifySTRef ref (Map.delete (Expression expID_LHS [] tokens))
+          -- STRef.modifySTRef ref (Map.insert (Expression expID_LHS [] tokens) (typeID, val_or_func, VAL_ARR new_arr, exp))
+          let (a, b, VAL_ARR vec, c) = (symbolTable3 Map.! key)
+          mvec <- Vec.unsafeThaw vec
+          MVec.write mvec (fromInteger ind_val) exp_interp
+          freezed <- Vec.unsafeFreeze mvec
+          STRef.modifySTRef ref (Map.insert key (a, b, VAL_ARR $ freezed, c))
           STRef.readSTRef ref
       in
         (symbolTable4, exp_interp)
@@ -102,25 +111,24 @@ interpret_statement (Expression expID exprs tokens) symbolTable
         VAL_NUM x -> x
         _ -> error "index must be number"
     in
-      (symtab2, VAL_ARR $ Arr.array (0, ind_val-1) [(i, VAL_NUM 0) | i <- [0 .. ind_val-1]])
+      -- (symtab2, VAL_ARR $ Arr.array (0, ind_val-1) [(i, VAL_NUM 0) | i <- [0 .. ind_val-1]])
+      (symtab2, VAL_ARR $ Vec.replicate (fromInteger ind_val) $ VAL_NUM 0)
   | expID == expID_IF =
       let
         (cond:expr_true:expr_false:[]) = exprs
-        !(cond_symboltable, cond_val)             = interpret_statement cond symbolTable
-        !(expr_true_symboltable, expr_true_val)   = interpret_statement expr_true cond_symboltable
-        !(expr_false_symboltable, expr_false_val) = interpret_statement expr_false cond_symboltable
+        !(cond_symboltable, cond_val) = interpret_statement cond symbolTable
       in
         case cond_val of
           VAL_NUM value ->
             case value of
-              0 -> (expr_false_symboltable, expr_false_val)
-              _ -> (expr_true_symboltable, expr_true_val)
+              0 -> let !(expr_false_symboltable, expr_false_val) = interpret_statement expr_false cond_symboltable in (expr_false_symboltable, expr_false_val)
+              _ -> let !(expr_true_symboltable, expr_true_val) = interpret_statement expr_true cond_symboltable in (expr_true_symboltable, expr_true_val)
           _ -> error "incompatible types"
   | expID == expID_WHILE = 
       let
         (cond:expr:[]) = exprs
         !(cond_symboltable, cond_val) = interpret_statement cond symbolTable
-        !(expr_symboltable, expr_val) = interpret_statement expr cond_symboltable
+        (expr_symboltable, expr_val) = interpret_statement expr cond_symboltable
         whileAgain = interpret_statement (Expression expID_WHILE [cond, expr] []) expr_symboltable -- the only thing thats changing is the updated symbol table
       in
         case cond_val of
@@ -138,7 +146,7 @@ interpret_statement (Expression expID exprs tokens) symbolTable
       (newsymtab, VAL_EMPTY)
   | expID == expID_CALL =
     let
-      Just (return_type, _, _, Expression _ es ts) = Map.lookup (Expression expID_FUNC [] tokens) $ symbolTable
+      (return_type, _, _, Expression _ es ts) = maybe (error "function does not exist") id $ Map.lookup (Expression expID_FUNC [] tokens) $ symbolTable
       zipped = zip exprs $ tail ts
       (newsymtab, funcsymtab) = foldr (\(exp, tok) (symtab, map) ->
                            let
@@ -171,15 +179,21 @@ interpret_statement (Expression expID exprs tokens) symbolTable
                   maybe_arr = Map.lookup (Expression expID_LHS [] [TOK_USERDEF x]) symbolTable
                   (_, _, VAL_ARR prev_arr, _) = maybe (error "array doesnt exist, cannot assign values into it yet") id maybe_arr
                 in
-                  (symtab2, prev_arr Arr.! ind_val)
+                  (symtab2, prev_arr Vec.! (fromInteger ind_val))
           _ -> error "invalid type"
   | expID == expID_DUMP =
     let
       !(symtab2, output) = interpret_statement (head exprs) symbolTable
     in
       unsafePerformIO $ do
-      putStrLn $ show output
-      return (symtab2, VAL_EMPTY)
+         putStr $
+           case output of
+             VAL_NUM x ->
+               if | x > 255 -> ['?']
+                  | True -> [chr $ fromInteger x]
+             VAL_ARR arr -> (show arr) ++ ['\n']
+             _ -> error "cannot print this type"
+         return (symtab2, VAL_EMPTY)
   | True =
     let
       (exp1:exp2:[]) = exprs

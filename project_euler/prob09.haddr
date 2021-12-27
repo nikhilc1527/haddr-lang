@@ -1,0 +1,30 @@
+LIMIT = 1000;
+
+N = 1;
+not_done = 1;
+while N < 1000 && not_done do
+   sum = 0;
+   M = N + 1;
+   a = 0;
+   b = 0;
+   c = 0;
+   while sum < 1000 do
+      a = M*M - N*N;
+      b = 2 * M * N;
+      c = M*M + N*N;
+      sum = a + b + c;
+      . sum;
+      M = M + 1;
+   end;
+   if sum - 1000 do else
+      . 0;
+      . 0;
+      . 0;
+      . a;
+      . b;
+      . c;
+      . (a * b * c);
+      not_done = 0;
+   end;
+   N = N + 1;
+end;

@@ -1,0 +1,44 @@
+func puti num do
+   if num < 0 do
+      . 45;
+      num = 0 - num;
+   else end;
+   if num do
+      dig_len = 2;
+      digits = [dig_len];
+      i = 0;
+      while num > 0 do
+         if i > dig_len-1 do
+            new_dig_len = dig_len * 2;
+            new_arr = [dig_len * 2];
+            j = 0;
+            while j < dig_len do
+               new_arr[j] = digits[j];
+               j = j + 1;
+            end;
+            digits = new_arr;
+            dig_len = new_dig_len;
+         else end;
+         
+         digits[i] = num % 10;
+         num = num / 10;
+         i = i + 1;
+      end;
+      i = i - 1;
+      while i > 0-1 do
+         . digits[i] + 48;
+         i = i - 1;
+      end;
+   else . 48; end;
+end;
+
+puti(20);
+. 10;
+puti(201);
+. 10;
+puti(99999);
+. 10;
+puti(0-99999123);
+. 10;
+puti(4-5-3);
+. 10;

@@ -1,4 +1,4 @@
-PRIME_LENGTH = 100000;
+PRIME_LENGTH = 200000;
 primes = [PRIME_LENGTH];
 
 func print_arr arr arr_len do
@@ -17,9 +17,7 @@ while N < PRIME_LENGTH do
 end;
 N = 2;
 while N < PRIME_LENGTH do
-    if N < PRIME_LENGTH do
     if primes[N] do
-       . N;
         j = N * 2;
        print_arr(primes, PRIME_LENGTH);
         while j < PRIME_LENGTH do
@@ -27,15 +25,23 @@ while N < PRIME_LENGTH do
             j = j + N;
         end;
     else end;
-    else end;
     N = N + 1;
 end;
 
-i = 0;
-   while i < PRIME_LENGTH do
-      . i;
-      . primes[i];
+. 0;
+
+i = 2;
+N = 10001;
+while N > 0 do
+      is = primes[i];
+      if is do
+         N = N - 1;
+      else end;
       i = i + 1;
-   end;
+      if N % 100 do else . N end;
+end;
+i = i - 1;
+
+. i;
 
 0

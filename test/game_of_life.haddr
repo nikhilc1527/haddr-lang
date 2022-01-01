@@ -74,9 +74,8 @@ func get_neighbors board i j BOARD_WIDTH BOARD_HEIGHT do
            end;
            x = x + 1;
      end;
-     neighbors = neighbors - board[i * BOARD_WIDTH + j];
-
-     neighbors
+     
+     neighbors - board[i * BOARD_WIDTH + j]
 end;
 
 func update_board board BOARD_WIDTH BOARD_HEIGHT do
@@ -88,9 +87,9 @@ func update_board board BOARD_WIDTH BOARD_HEIGHT do
                  neighbors = get_neighbors(board, i, j, BOARD_WIDTH, BOARD_HEIGHT);
                  cur_val = board[i * BOARD_WIDTH + j];
                  new_val =
-                         if cur_val && (neighbors == 2 || neighbors == 3) do 1 else
-                         if (1-cur_val) && (neighbors == 3) do 1 else
-                         0
+                         if cur_val && (neighbors == 2 || neighbors == 3) do 1
+                         else if (1-cur_val) && (neighbors == 3) do 1
+                         else 0
                          end end;
                  new_board[i * BOARD_WIDTH + j] = new_val;
 
@@ -102,26 +101,11 @@ func update_board board BOARD_WIDTH BOARD_HEIGHT do
      new_board
 end;
 
-func print_neighbors board width height do
-     i = 0;
-     while i < height do
-           j = 0;
-           while j < width do
-                 neighbors = get_neighbors(board, i, j, width, height);
-                 puti(neighbors);
-
-                 j = j + 1;
-           end;
-           . 10;
-           i = i + 1;
-     end;
-end;
-
 board = [BOARD_WIDTH * BOARD_HEIGHT];
 i = 0;
 while i < BOARD_WIDTH * BOARD_HEIGHT do board[i] = 0; i = i + 1; end;
 
-// glider initial state
+// glider initial state, can be set to anything
 board[1] = 1;
 board[BOARD_WIDTH + 2] = 1;
 board[BOARD_WIDTH*2 + 0] = 1;
@@ -130,7 +114,7 @@ board[BOARD_WIDTH*2 + 2] = 1;
 
 print_board(board, BOARD_WIDTH, BOARD_HEIGHT);
 k = 1;
-while k > 0 do
+while (1) do
      // i = 0;
      // while i < 10000 do i = i + 1; end;
      
@@ -138,5 +122,6 @@ while k > 0 do
 
      move_left(BOARD_WIDTH);
      move_up(BOARD_HEIGHT);
-      print_board(board, BOARD_WIDTH, BOARD_HEIGHT);
+     print_board(board, BOARD_WIDTH, BOARD_HEIGHT);
 end;
+

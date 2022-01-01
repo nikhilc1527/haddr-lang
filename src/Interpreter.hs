@@ -128,14 +128,14 @@ interpret_statement (Expression expID exprs tokens) symbolTable
       let
         (cond:expr:[]) = exprs
         !(cond_symboltable, cond_val) = interpret_statement cond symbolTable
-        (expr_symboltable, expr_val) = interpret_statement expr cond_symboltable
-        whileAgain = interpret_statement (Expression expID_WHILE [cond, expr] []) expr_symboltable -- the only thing thats changing is the updated symbol table
+        -- (expr_symboltable, expr_val) = interpret_statement expr cond_symboltable
+        -- whileAgain = interpret_statement (Expression expID_WHILE [cond, expr] []) expr_symboltable -- the only thing thats changing is the updated symbol table
       in
         case cond_val of
           VAL_NUM value ->
             case value of
               0 -> (cond_symboltable, VAL_EMPTY)
-              _ -> whileAgain
+              _ -> let !(expr_symboltable, expr_val) = interpret_statement expr cond_symboltable in interpret_statement (Expression expID_WHILE [cond, expr] []) expr_symboltable
           _ -> error "incompatible types"
   | expID == expID_FUNC = 
     let
@@ -161,7 +161,7 @@ interpret_statement (Expression expID exprs tokens) symbolTable
     let value = head tokens in
         case value of
           TOK_LITERALNUM x -> (symbolTable, VAL_NUM $ read x)
-          TOK_LITERALSTRING x -> (symbolTable, VAL_STRING x)
+          TOK_LITERALSTRING x -> (symbolTable, VAL_ARR $ Vec.fromList $ ((VAL_NUM . toInteger . ord) <$> (tail $ init $ x)))
           TOK_USERDEF x ->
             case exprs of
               [] -> 
@@ -190,10 +190,13 @@ interpret_statement (Expression expID exprs tokens) symbolTable
          putStr $
            case output of
              VAL_NUM x ->
-               if | x > 255 -> ['?']
+               if | x > 255 || x < 0 -> "?"
                   | True -> [chr $ fromInteger x]
-             VAL_ARR arr -> (show arr) ++ ['\n']
-             _ -> error "cannot print this type"
+             VAL_ARR arr -> (\x -> case x of
+                                   VAL_NUM y -> chr $ fromInteger y
+                                   _ -> error "cannot print this type1"
+                               ) <$> Vec.toList arr
+             _ -> error "cannot print this type2"
          return (symtab2, VAL_EMPTY)
   | True =
     let

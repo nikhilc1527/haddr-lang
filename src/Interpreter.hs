@@ -27,7 +27,7 @@ type SymbolTable = Map.Map
 
 interpret_block :: SymbolTable -> Expression -> (SymbolTable, Value)
 interpret_block symbolTable (Expression expID exprs tokens)
-  | expID__ /= 21 = error "not exhaustive handling of interpreting statements"
+  | expID__ /= 22 = error "not exhaustive handling of interpreting statements"
   | expID /= expID_SRCBLOCK = interpret_statement (Expression expID exprs tokens) symbolTable
   | null exprs = (symbolTable, VAL_EMPTY)
   | length exprs == 1 =
@@ -67,7 +67,7 @@ interpret_statement (Expression expID exprs tokens) symbolTable
       let
         ((Expression _ [] tokens2):exp:[]) = exprs
         !(symbolTable2, exp_interp) = interpret_statement exp symbolTable
-        val_or_func = (length tokens) == 1 -- if theres only one token in the lhs, then its a variable, otherwise its a function
+        val_or_func = True -- (length tokens) == 1 -- if theres only one token in the lhs, then its a variable, otherwise its a function
         typeID = 0 -- TODO: find out type id from all the types inside of exp
         symbolTable3 = ST.runST $ do
           ref <- STRef.newSTRef symbolTable2
@@ -148,11 +148,12 @@ interpret_statement (Expression expID exprs tokens) symbolTable
     let
       (return_type, _, _, Expression _ es ts) = maybe (error "function does not exist") id $ Map.lookup (Expression expID_FUNC [] tokens) $ symbolTable
       zipped = zip exprs $ tail ts
+      funcs_symtab = Map.filter (\(a,b,c,d) -> not b) symbolTable
       (newsymtab, funcsymtab) = foldr (\(exp, tok) (symtab, map) ->
                            let
                              (newsymtab, arg_interpreted) = interpret_statement exp symtab
                            in
-                             (newsymtab, Map.insert (Expression expID_LHS [] [tok]) (typeID_INT, True, arg_interpreted, exp) map)) (symbolTable, Map.empty) zipped
+                             (newsymtab, Map.insert (Expression expID_LHS [] [tok]) (typeID_INT, True, arg_interpreted, exp) map)) (symbolTable, funcs_symtab) zipped
       !interp = interpret_statement (head es) funcsymtab
     in
       (\(_, v) -> (symbolTable, v)) $ interp
@@ -205,6 +206,7 @@ interpret_statement (Expression expID exprs tokens) symbolTable
         | expID == expID_MOD = statement_interpreter_generator mod exp1 exp2 symbolTable
         | expID == expID_LT = statement_interpreter_generator (\ x y -> bool 0 1 (x < y)) exp1 exp2 symbolTable
         | expID == expID_GT = statement_interpreter_generator (\ x y -> bool 0 1 (x > y)) exp1 exp2 symbolTable
+        | expID == expID_DOUBLE_EQ = statement_interpreter_generator (\ x y -> bool 0 1 (x == y)) exp1 exp2 symbolTable
         | expID == expID_AND = statement_interpreter_generator (\ x y -> (abs $ signum $ x) * (abs $ signum $ y)) exp1 exp2 symbolTable
         | expID == expID_OR = statement_interpreter_generator (\ x y -> (abs $ signum $ x) + (abs $ signum $ y)) exp1 exp2 symbolTable
         | True = error ("unhandled expression for interpreting: " ++ (show $ Expression expID exprs tokens))

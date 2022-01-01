@@ -25,6 +25,7 @@ data TokenType =
   TOK_MULT               |
   TOK_DIV                |
   TOK_MOD                |
+  TOK_DOUBLE_EQUALS      |
   TOK_LT                 |
   TOK_GT                 |
   TOK_AND                |
@@ -50,7 +51,8 @@ data TokenType =
 getTokens :: String -> [TokenType]
 getTokens [] = []
 getTokens (first_char:rest)
-  | isSpace first_char                       = rest_tokens
+  | firstsep == "//"                         = getTokens $ tail $ dropWhile (/= '\n') rest
+  | isSpace first_char                      = rest_tokens
   | first_char == ':'                        = (TOK_SYSCALL firstword):rest_words_tokens
   | first_char == '{'                        = TOK_CURLYBRACKETOPEN:rest_tokens
   | first_char == '}'                        = TOK_CURLYBRACKETCLOSE:rest_tokens
@@ -59,6 +61,7 @@ getTokens (first_char:rest)
   | first_char == '('                        = TOK_PARENOPEN:rest_tokens
   | first_char == ')'                        = TOK_PARENCLOSE:rest_tokens
   | first_char == ';'                        = TOK_SEMICOLON:rest_tokens
+  | firstsep   == "=="                       = TOK_DOUBLE_EQUALS:after_space_tokens
   | first_char == '='                        = TOK_EQUALS:rest_tokens
   | first_char == '+'                        = TOK_PLUS:rest_tokens
   | first_char == '-'                        = TOK_MINUS:rest_tokens

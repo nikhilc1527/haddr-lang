@@ -1,3 +1,6 @@
+BOARD_WIDTH  = 20;
+BOARD_HEIGHT = 20;
+
 func puti num do
    if num < 0 do
       . 45;
@@ -31,9 +34,109 @@ func puti num do
       end;
    else . 48; end;
 end;
-
-func reset_board width height puti do
-     func move_left n puti do
-          . 27; . 91;
+func move_left n do
+     . 27; . 91;
+     puti(n);
+     . 68;
+end;
+func move_up n do
+     . 27; . 91;
+     puti(n);
+     . 65;
+end;
+func reset_board width height do
+     move_left(width);
+     move_up(height);
+end;
+func print_board board BOARD_WIDTH BOARD_HEIGHT do
+     i = 1;
+     while i-1 < BOARD_WIDTH * BOARD_HEIGHT do
+           if board[i-1] == 0 do . 46 else . 35 end;
+           if (i % BOARD_WIDTH) == 0 do
+                 . 10;
+           else end;
+           i = i + 1;
      end;
+end;
+
+func get_neighbors board i j BOARD_WIDTH BOARD_HEIGHT do
+     neighbors = 0;
+
+     x = 0-1;
+     while (x < 2) do
+           y = 0-1;
+           while (y < 2) do
+                 a = (i + x + BOARD_HEIGHT) % BOARD_HEIGHT;
+                 b = (j + y + BOARD_WIDTH) % BOARD_WIDTH;
+                 c = board[a * BOARD_WIDTH + b];
+                 neighbors = neighbors + c;
+                 y = y + 1;
+           end;
+           x = x + 1;
+     end;
+     neighbors = neighbors - board[i * BOARD_WIDTH + j];
+
+     neighbors
+end;
+
+func update_board board BOARD_WIDTH BOARD_HEIGHT do
+     new_board = [BOARD_WIDTH * BOARD_HEIGHT];
+     i = 0;
+     while i < BOARD_HEIGHT do
+           j = 0;
+           while j < BOARD_WIDTH do
+                 neighbors = get_neighbors(board, i, j, BOARD_WIDTH, BOARD_HEIGHT);
+                 cur_val = board[i * BOARD_WIDTH + j];
+                 new_val =
+                         if cur_val && (neighbors == 2 || neighbors == 3) do 1 else
+                         if (1-cur_val) && (neighbors == 3) do 1 else
+                         0
+                         end end;
+                 new_board[i * BOARD_WIDTH + j] = new_val;
+
+                 j = j + 1;
+           end;
+           
+           i = i + 1;
+     end;
+     new_board
+end;
+
+func print_neighbors board width height do
+     i = 0;
+     while i < height do
+           j = 0;
+           while j < width do
+                 neighbors = get_neighbors(board, i, j, width, height);
+                 puti(neighbors);
+
+                 j = j + 1;
+           end;
+           . 10;
+           i = i + 1;
+     end;
+end;
+
+board = [BOARD_WIDTH * BOARD_HEIGHT];
+i = 0;
+while i < BOARD_WIDTH * BOARD_HEIGHT do board[i] = 0; i = i + 1; end;
+
+// glider initial state
+board[1] = 1;
+board[BOARD_WIDTH + 2] = 1;
+board[BOARD_WIDTH*2 + 0] = 1;
+board[BOARD_WIDTH*2 + 1] = 1;
+board[BOARD_WIDTH*2 + 2] = 1;
+
+print_board(board, BOARD_WIDTH, BOARD_HEIGHT);
+k = 1;
+while k > 0 do
+     // i = 0;
+     // while i < 10000 do i = i + 1; end;
+     
+     board = update_board(board, BOARD_WIDTH, BOARD_HEIGHT);
+
+     move_left(BOARD_WIDTH);
+     move_up(BOARD_HEIGHT);
+      print_board(board, BOARD_WIDTH, BOARD_HEIGHT);
 end;

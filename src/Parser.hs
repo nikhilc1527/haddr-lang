@@ -4,7 +4,7 @@ import Lexer
 
 import Data.Bool
 import Data.Data
-import Split
+import Data.List.Split
 import qualified Debug.Trace as Trace
 import Data.Hashable
 import Text.Printf
@@ -36,23 +36,24 @@ expID_MINUS      = 5
 expID_MULT       = 6
 expID_DIV        = 7
 expID_MOD        = 8
-expID_LT         = 9
-expID_GT         = 10
-expID_AND        = 11
-expID_OR         = 12
-expID_DUMP       = 13
-expID_UNARY      = 14
-expID_VALUE      = 15
-expID_LHS        = 16
-expID_ARR_CREAT  = 17
-expID_ARR_ASSIGN = 18
-expID_ASSIGNMENT = 19
-expID_SRCBLOCK   = 20
-expID__          = 21
+expID_DOUBLE_EQ  = 9
+expID_LT         = 10
+expID_GT         = 11
+expID_AND        = 12
+expID_OR         = 13
+expID_DUMP       = 14
+expID_UNARY      = 15
+expID_VALUE      = 16
+expID_LHS        = 17
+expID_ARR_CREAT  = 18
+expID_ARR_ASSIGN = 19
+expID_ASSIGNMENT = 20
+expID_SRCBLOCK   = 21
+expID__          = 22
 
 print_exp :: Int -> Expression -> String
 print_exp spaces (Expression exprID exprs tokens)
-  | expID__ /= 21 = error "Print Expression not exhaustive handling"
+  | expID__ /= 22 = error "Print Expression not exhaustive handling"
   | exprID == expID_IF          = let (cond:e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "IF\n"  ++ (print_exp (spaces+2) cond) ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
   | exprID == expID_WHILE       = let (cond:e1:[]) = exprs in (take spaces $ repeat ' ') ++ "WHILE\n"  ++ (print_exp (spaces+2) cond) ++ (print_exp (spaces+2) e1)
   | exprID == expID_FUNC        = let (body:[]) = exprs  in (take spaces $ repeat ' ') ++ "FUNC\n"  ++ (take (spaces+2) $ repeat ' ') ++ (show $ head $ tokens) ++ "\n" ++ (take (spaces+2) $ repeat ' ') ++ (show $ tail $ tokens) ++ "\n" ++ (print_exp (spaces+2) $ head exprs)
@@ -63,6 +64,7 @@ print_exp spaces (Expression exprID exprs tokens)
   | exprID == expID_MOD         = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "MOD\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
   | exprID == expID_LT          = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "LT\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
   | exprID == expID_GT          = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "GT\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+  | exprID == expID_DOUBLE_EQ   = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "EQUALITY\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
   | exprID == expID_AND         = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "AND\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
   | exprID == expID_OR          = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "OR\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
   | exprID == expID_DUMP        = let (e1:[])    = exprs in (take spaces $ repeat ' ') ++ "DUMP\n" ++ (print_exp (spaces+2) e1)
@@ -109,7 +111,7 @@ untilClose opening closing stack tokens
 parseL0 :: [TokenType] -> (Expression, [TokenType]) -- returns maybe a syntax tree of expression or nothing if couldnt parse, and if could parse then the 
 parseL0 [] = invalid_parse
 parseL0 _
-  | expID__ /= 21 = error "Parse Expression not exhaustive handling"
+  | expID__ /= 22 = error "Parse Expression not exhaustive handling"
 -- dump operator
 -- . <expr>
 parseL0 (TOK_DUMP:tokens_0)
@@ -122,7 +124,7 @@ parseL0 (TOK_FUNC:tokens_0) = ((Expression expID_FUNC [body_parsed] args), rest_
   where
     funcname    = head tokens_0
     args        = takeWhile (/= TOK_DO) $ tokens_0
-    (body_tokens, rest_tokens) = untilClose [TOK_IF, TOK_WHILE, TOK_FUNC] [TOK_END] 1 $ Trace.traceShowId $ tail $ dropWhile (/= TOK_DO) $ Trace.traceShowId $ tokens_0
+    (body_tokens, rest_tokens) = untilClose [TOK_IF, TOK_WHILE, TOK_FUNC] [TOK_END] 1 $ tail $ dropWhile (/= TOK_DO) $ tokens_0
     body_parsed = parseSource body_tokens
 -- if statement
 -- if <cond> do <body> else <body> end
@@ -224,7 +226,7 @@ operatorParser operators next_parser tokens_0
 
 parseL1 = operatorParser [(TOK_AND, expID_AND), (TOK_OR, expID_OR)] parseL2
 
-parseL2 = operatorParser [(TOK_LT, expID_LT), (TOK_GT, expID_GT)] parseL3
+parseL2 = operatorParser [(TOK_LT, expID_LT), (TOK_GT, expID_GT), (TOK_DOUBLE_EQUALS, expID_DOUBLE_EQ)] parseL3
 
 parseL3 = operatorParser [(TOK_PLUS, expID_PLUS), (TOK_MINUS, expID_MINUS)] parseL4
 

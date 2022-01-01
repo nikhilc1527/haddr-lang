@@ -14,8 +14,9 @@ import Compiler
 
 interpret_text :: String -> IO ()
 interpret_text text = do
-  putStr $ printf "tokens --> %s\nparse tree --> \n%s\ninterpreted value --> %s\n"
-                    (show tokens) parse_tree_showed (show interpreted)
+  putStr $ printf "interpreted value --> %s\n" (show interpreted)
+  -- putStr $ printf "tokens --> %s\nparse tree --> \n%s\ninterpreted value --> %s\n"
+  --                   (show tokens) parse_tree_showed (show interpreted)
   -- compile_text_and_output_and_call_compilation text
   where
     tokens = getTokens text
@@ -25,8 +26,9 @@ interpret_text text = do
     (symtab, interpreted) = interpret_block Map.empty parse_tree
 
 compile_text_and_output_and_call_compilation :: String -> IO ()
-compile_text_and_output_and_call_compilation text = do
-  writeFile "output.asm" asm_folded
+compile_text_and_output_and_call_compilation text = undefined
+  -- do
+  -- writeFile "output.asm" asm_folded
   -- putStr "\n--- asm ---\n"
   -- putStr asm_folded
   -- createProcess $ proc "nasm" ["nasm", "-f elf64", "-o output.o", "output.asm"]
@@ -35,8 +37,8 @@ compile_text_and_output_and_call_compilation text = do
     
     parse_tree = parseSource tokens
     parse_tree_showed = print_exp 0 parse_tree
-    asm = exprToASM parse_tree Map.empty 0 0 "rax"
-    asm_folded = foldl (++) "" asm
+    -- asm = exprToASM parse_tree Map.empty 0 0 "rax"
+    -- asm_folded = foldl (++) "" asm
 
 -- if you want a nice repl experience use the readline library wrapper https://github.com/hanslub42/rlwrap
 repl :: IO()

@@ -15,4 +15,4 @@ while i < max + 1 do
       i = i + 1;
 end;
 square_of_sum = square_of_sum * square_of_sum;
-. square_of_sum - sum_of_squares;
+puti(square_of_sum - sum_of_squares); . 10;

@@ -9,6 +9,7 @@ import qualified Debug.Trace as Trace
 import System.IO.Unsafe -- for unsafe printing
 import Data.Bool
 import Data.Char
+import Data.Foldable
 
 import Lexer
 import Parser
@@ -24,6 +25,19 @@ data Value =
 type SymbolTable = Map.Map
                    Expression -- has to be expID_LHS
                    (TypeID, Bool, Value, Expression) -- id of return type, is it variable(true) or function(false), value of variable (if it is a variable, otherwise VAL_EMPTY for function), the expression that this value is assigned
+
+-- for adding functions like puti, will be taken out after i implement importing
+initialSymbolTable :: SymbolTable
+initialSymbolTable = foldr (\src map ->
+                              let
+                               tokens = getTokens src
+                               parse_tree = parseSource tokens
+                               (symtab, val) = interpret_block map parse_tree
+                              in
+                                symtab
+                           ) Map.empty sources
+  where
+    sources = ["func puti num do if num < 0 do . 45; num = 0 - num; else end; if num do dig_len = 2; digits = [dig_len]; i = 0; while num > 0 do if i > dig_len-1 do new_dig_len = dig_len * 2; new_arr = [dig_len * 2]; j = 0; while j < dig_len do new_arr[j] = digits[j]; j = j + 1; end; digits = new_arr; dig_len = new_dig_len; else end; digits[i] = num % 10; num = num / 10; i = i + 1; end; i = i - 1; while i > 0-1 do . digits[i] + 48; i = i - 1; end; else . 48; end; end;"]
 
 interpret_block :: SymbolTable -> Expression -> (SymbolTable, Value)
 interpret_block symbolTable (Expression expID exprs tokens)

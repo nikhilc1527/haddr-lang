@@ -2,16 +2,16 @@ i = 1;
 lcm = 1;
 max = 20;
 while i < max + 1 do
-a = lcm;
-b = i;
-R = a % b;
-while (a % b > 0) do
-R = a % b;
-a = b;
-b = R;
-end;
-lcm = i * lcm / b;
-. i;
-. lcm;
-i = i + 1;
+  a = lcm;
+  b = i;
+  R = a % b;
+  while (a % b > 0) do
+    R = a % b;
+    a = b;
+    b = R;
+  end;
+  lcm = i * lcm / b;
+  puti(i); . 10;
+  puti(lcm); . 10;
+  i = i + 1;
 end;

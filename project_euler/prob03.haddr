@@ -25,4 +25,4 @@ do
   end;
   i = i + 1;
 end;
-largest
+puti(largest); . 10;

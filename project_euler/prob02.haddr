@@ -14,4 +14,4 @@ do
     sum = sum + a;
   end;
 end;
-sum;
+puti(sum); . 10;

@@ -6,6 +6,7 @@ import Text.Printf
 import Data.Bool
 import qualified Data.Map as Map
 import qualified System.Process as Process
+import qualified Debug.Trace as Trace
 
 import Lexer
 import Parser
@@ -24,7 +25,7 @@ interpret_text text = return ()
     
     parse_tree = parseSource tokens
     parse_tree_showed = print_exp 0 parse_tree
-    !(symtab, interpreted) = interpret_block Map.empty parse_tree
+    !(symtab, interpreted) = interpret_block initialSymbolTable parse_tree
 
 compile_text_and_output_and_call_compilation :: String -> IO ()
 compile_text_and_output_and_call_compilation text = undefined

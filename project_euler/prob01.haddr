@@ -10,4 +10,4 @@ do
    end;
    i = i + 1;
 end;
-sum;
+puti(sum); . 10;

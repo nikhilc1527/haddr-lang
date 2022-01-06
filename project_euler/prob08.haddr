@@ -25,4 +25,4 @@ while VAL > max do
    VAL = VAL / 10;
    if prod > max_prod do max_prod = prod; else end;
 end;
-. max_prod;
+puti(max_prod); . 10;

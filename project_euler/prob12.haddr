@@ -32,28 +32,29 @@ func puti num do
    else . 48; end;
 end;
 
-LIMIT = 1000;
-
-N = 1;
-not_done = 1;
-while N < 1000 && not_done do
-   sum = 0;
-   M = N + 1;
-   a = 0;
-   b = 0;
-   c = 0;
-   while sum < 1000 do
-      a = M*M - N*N;
-      b = 2 * M * N;
-      c = M*M + N*N;
-      sum = a + b + c;
-      M = M + 1;
-   end;
-   if sum == 1000 do
-      . "The output value is: ";
-      puti(a * b * c);
-      . 10;
-      not_done = 0;
-   else end;
-   N = N + 1;
+func get_num_factors num do
+     res = 1;
+     i = 2;
+     while num > 1 do
+          j = 1;
+          while num % i == 0 do
+                num = num / i;
+                j = j + 1;
+          end;
+          res = res * j;
+          i = i + 1;
+     end;
+     res
 end;
+
+i = 1;
+n = 0;
+MAX_DIV = 50;
+divs = get_num_factors(n);
+while divs < MAX_DIV do
+      n = n + i;
+      i = i + 1;
+      divs = get_num_factors(n);
+      // puti(n); . " : "; puti(divs); . 10;
+end;
+puti(n);

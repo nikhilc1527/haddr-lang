@@ -29,58 +29,57 @@ import Parser
 import Lexer
 
 import Control.Monad.State
+import Control.Monad
+import Control.Applicative
 
-type Register = String
+data Operand = Register String | Addr String
 
 data Instruction =
-  MOV Register Register
+  Mov Operand Operand |
+  Add Operand Operand |
+  Call Operand |
+  Cmp Operand Operand |
+  Je Operand |
+  Jlt Operand |
+  Div Operand Operand |
+  Interrupt Int |
+  Mul Operand Operand |
+  Pop Operand |
+  Push Operand |
+  Return |
+  Sub Operand Operand |
+  Syscall
 
 -- type id of the symbol, the string name of the symbol, and the 
 type Symbol = (TypeID, String, Int)
--- type ASMSymbolTable = Map.Map String Symbol
+type ASMSymbolTable = Map.Map String Symbol
 
-data ASM = ASM { funcs :: [Instruction], bss :: [[String]] }
+data ASM = ASM { funcs :: [Instruction], bss :: [(String, String)] }
 
-newtype Compiler = Compiler { runCompiler :: (Expression, ASMSymbolTable) -> (Expression, ASMSymbolTable, ASM) }
+type CompilerFuncType a = (Expression, ASMSymbolTable) -> Maybe (Expression, ASMSymbolTable, a)
+newtype Compiler a = Compiler { compile :: CompilerFuncType a }
 
-type ASMSymbolTable = Map.Map String (Int, Int)
-type BlockDepth = Int
-type MaxOffset = Int
+instance Functor Compiler where
+  fmap f (Compiler comp) =
+    Compiler $ \(e, st) -> do
+      (a,b,c) <- comp (e,st)
+      return (a,b,f c)
 
-compileASM :: ASM -> String
-compileASM = undefined
+instance Applicative Compiler where
+  pure a = Compiler $ (\(e,st) -> Just (e,st, a))
+  a <*> b = Compiler $ \input -> do
+    (x1,y1,f) <- a.compile input
+    (x2,y2,z) <- b.compile (x1,y1)
+    return (x2,y2, f z)
 
-mov :: Compiler
-mov = undefined
-push :: Compiler
-push = undefined
+instance Alternative Compiler where
+  empty = Compiler $ const Nothing
+  (Compiler a) <|> (Compiler b) = Compiler $ \input -> case a input of
+                                                        Nothing -> b input
+                                                        Just c -> Just c
 
--- -- expression to generate asm for, symbol table map, block depth, register to store the result in
--- exprToASM :: Expression -> ASMSymbolTable -> BlockDepth -> MaxOffset -> Register -> ASM
-
--- -- SOURCE BLOCK
--- exprToASM (Expression expID exprs toks) symtab depth max_offset reg
---   | expID == expID_SRCBLOCK =
---     concat $ map (\ x -> exprToASM x Map.empty (depth+1) max_offset "rax") $ exprs
-
--- -- VALUE
--- exprToASM (Expression expID exprs toks) symtab depth max_offset reg
---   | expID == expID_VALUE =
---     case head toks of
---       TOK_LITERALNUM x -> mov reg (init $ tail $ show x)
---       -- TOK_USERDEF x -> mov (show x) reg
-
--- -- PLUS
--- exprToASM (Expression expID exprs toks) symtab depth max_offset reg
---   | expID == expID_PLUS = left_out:right_out:op:mov_out
---   where
---     left_out = concat $ exprToASM (exprs !! 0) symtab depth max_offset "rax"
---     right_out = concat $ exprToASM (exprs !! 1) symtab depth max_offset "rbx"
---     op = "add rax, rbx\n"
---     mov_out = mov "rax" reg
-
--- -- DUMP
--- exprToASM (Expression expID exprs toks) symtab depth max_offset reg
---   | expID == expID_DUMP = child ++ (mov "rdi" reg) ++ ["call printi"]
---   where
---     child = exprToASM (head exprs) symtab depth max_offset reg
+addCompiler :: Operand -> CompilerFuncType ASM
+addCompiler (Addr a) _ = error "have to add into a register"
+addCompiler (Register r) ((Expression id exprs toks), symtab) =
+                                          if | id == expID_PLUS -> undefined
+                                             | True -> Nothing

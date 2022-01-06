@@ -13,8 +13,9 @@ import Interpreter
 import Compiler
 
 interpret_text :: String -> IO ()
-interpret_text text = do
-  putStr $ printf "interpreted value --> %s\n" (show interpreted)
+interpret_text text = return ()
+  -- do
+  -- putStr $ printf "interpreted value --> %s\n" (show interpreted)
   -- putStr $ printf "tokens --> %s\nparse tree --> \n%s\ninterpreted value --> %s\n"
   --                   (show tokens) parse_tree_showed (show interpreted)
   -- compile_text_and_output_and_call_compilation text
@@ -23,7 +24,7 @@ interpret_text text = do
     
     parse_tree = parseSource tokens
     parse_tree_showed = print_exp 0 parse_tree
-    (symtab, interpreted) = interpret_block Map.empty parse_tree
+    !(symtab, interpreted) = interpret_block Map.empty parse_tree
 
 compile_text_and_output_and_call_compilation :: String -> IO ()
 compile_text_and_output_and_call_compilation text = undefined

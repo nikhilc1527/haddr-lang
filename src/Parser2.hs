@@ -1,5 +1,3 @@
-
-
 module Parser2 where
 
 import Lexer
@@ -35,12 +33,12 @@ data Error i e
   deriving (Eq, Show)
 
 data Input i = Input
-  { inputs :: [i],
+  { str :: [i],
     pos :: Int
   } deriving (Show, Eq)
 
 newtype Parser i e a = Parser
-  { run :: [i] -> Either [Error i e] (a, [i])
+  { run :: Input i -> Either [Error i e] (a, Input i)
   }
 
 instance Functor (Parser i e) where
@@ -75,10 +73,10 @@ instance Monad (Parser i e) where
 
 satisfyP :: (i -> Bool) -> Parser i e i
 satisfyP pred = Parser $ \input ->
-  case input of
+  case input.str of
     [] -> Left [EndOfInput]
     hd : rest
-      | pred hd -> Right (hd, rest)
+      | pred hd -> Right (hd, input { str = rest, pos = input.pos + 1 } )
       | otherwise    -> Left [Unexpected hd]
 
 charP :: Eq i => i -> Parser i e i
@@ -89,12 +87,12 @@ stringP = sequenceA . map charP
 
 spanP :: Eq i => (i -> Bool) -> Parser i e [i]
 spanP pred = Parser $ \input ->
-  let (a, b) = span (pred) input
+  let (a, b) = span (pred) input.str
   in case a of
        [] -> case b of
               [] -> Left [EndOfInput]
               (x:xs) -> Left [Unexpected x]
-       _ -> Right (a, b)
+       _ -> Right (a, input { str = b, pos = input.pos+(length a) } )
 
 data Expression =
   Exp_If Expression Expression Expression |
@@ -164,7 +162,7 @@ numP :: Eq e => Parser Char e Expression
 numP = (floatP) <|> (integerP)
 
 ws :: Parser Char e String
-ws = Parser $ \input -> Right $ span isSpace input
+ws = Parser $ \input -> Right $ let (a, b) = span isSpace input.str in (a, Input {str=b, pos=input.pos + (length a)})
 
 tryParse :: a -> Parser i e a -> Parser i e a
 tryParse def parser = Parser $ \input ->
@@ -270,6 +268,8 @@ parseFinal = numP <|> wordP <|> parensP
       return exp
 
 runParser :: (Show e, Eq e) => Parser Char e Expression -> String -> IO ()
-runParser parser input = putStrLn $ case parser.run input of
-                           Right (exp, rest) -> ((print_exp 0 exp) ++ "\nrest:\n" ++ rest)
+runParser parser input = putStrLn $ case parser.run input_obj of
+                           Right (exp, rest) -> ((print_exp 0 exp) ++ "\nrest:\n" ++ (show rest))
                            Left err -> show err
+  where
+    input_obj = Input {str=input, pos=0}

@@ -25,7 +25,7 @@ module Compiler where
 import qualified Data.Map as Map
 import Text.Printf
 
-import Parser
+import Parser2
 import Lexer
 
 import Control.Monad.State
@@ -78,8 +78,4 @@ instance Alternative Compiler where
                                                         Nothing -> b input
                                                         Just c -> Just c
 
-addCompiler :: Operand -> CompilerFuncType ASM
-addCompiler (Addr a) _ = error "have to add into a register"
-addCompiler (Register r) ((Expression id exprs toks), symtab) =
-                                          if | id == expID_PLUS -> undefined
-                                             | True -> Nothing
+

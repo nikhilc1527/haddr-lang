@@ -9,8 +9,8 @@ import qualified System.Process as Process
 import qualified Debug.Trace as Trace
 
 import Lexer
-import Parser
-import Interpreter
+import Parser2
+import Interpreter2
 import Compiler
 
 interpret_text :: String -> IO ()
@@ -21,11 +21,12 @@ interpret_text text = return ()
   --                   (show tokens) parse_tree_showed (show interpreted)
   -- compile_text_and_output_and_call_compilation text
   where
-    tokens = getTokens text
+    a = 1
+    -- tokens = getTokens text
     
-    parse_tree = parseSource tokens
-    parse_tree_showed = print_exp 0 parse_tree
-    !(symtab, interpreted) = interpret_block initialSymbolTable parse_tree
+    -- parse_tree = parseSource tokens
+    -- parse_tree_showed = print_exp 0 parse_tree
+    -- !(symtab, interpreted) = interpret_block initialSymbolTable parse_tree
 
 compile_text_and_output_and_call_compilation :: String -> IO ()
 compile_text_and_output_and_call_compilation text = undefined
@@ -35,10 +36,11 @@ compile_text_and_output_and_call_compilation text = undefined
   -- putStr asm_folded
   -- createProcess $ proc "nasm" ["nasm", "-f elf64", "-o output.o", "output.asm"]
   where
-    tokens = getTokens text
+    a = 0
+    -- tokens = getTokens text
     
-    parse_tree = parseSource tokens
-    parse_tree_showed = print_exp 0 parse_tree
+    -- parse_tree = parseSource tokens
+    -- parse_tree_showed = print_exp 0 parse_tree
     -- asm = exprToASM parse_tree Map.empty 0 0 "rax"
     -- asm_folded = foldl (++) "" asm
 

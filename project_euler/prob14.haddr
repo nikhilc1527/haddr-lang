@@ -1,0 +1,20 @@
+func resize_arr arr arr_len new_len do
+     new_arr = [new_len];
+     i = 0;
+     while i < arr_len do
+           new_arr[i] = arr[i];
+           i = i + 1;
+     end;
+     new_arr
+end;
+
+dp_len = 1000000;
+dp = [dp_len];
+dp[1] = 1;
+dp[2] = 2;
+dp[4] = 3;
+
+i = 0;
+while i < 20 do
+      
+end;

@@ -13,13 +13,12 @@ import Text.Printf
 import qualified Data.HashMap as Map
 import Control.Applicative
 
-type TypeID = Integer
-
-typeID_INT = 1
-typeID_STRING = 2
-typeID_BOOL = 3
-typeID_POINTER = 4
-typeID_FUNC = 5
+data Type = 
+  Type_Int
+  | Type_String
+  | Type_Bool
+  | Type_Pointer
+  | Type_Func
 
 -- type ExprID = Int
 -- data Expression = Expression ExprID [Expression] [TokenType]
@@ -97,8 +96,8 @@ spanP pred = Parser $ \input ->
 data Expression =
   Exp_If Expression Expression Expression |
   Exp_While Expression Expression |
-  Exp_Func [TokenType] Expression |
-  Exp_Call TokenType [Expression] |
+  Exp_Func Expression [Expression] Expression |
+  Exp_Call Expression [Expression] |
   Exp_Plus Expression Expression |
   Exp_Minus Expression Expression |
   Exp_Mult Expression Expression |
@@ -120,14 +119,17 @@ data Expression =
   Exp_SourceBlock [Expression] |
   Exp_Empty |
   Exp_INVALID
-  deriving (Show, Eq)
+  deriving (Eq)
 
+instance Show Expression where
+  show = print_exp 0
+
+sp :: Int -> String
 sp = (flip replicate) ' '
 print_exp :: Int -> Expression -> String
 print_exp spaces (Exp_If cond exp_true exp_false) = (sp spaces) ++ "IF\n" ++ (print_exp (spaces+2) cond) ++ (print_exp (spaces+2) exp_true) ++ (print_exp (spaces+2) exp_false)
 print_exp spaces (Exp_While cond exp) = (sp spaces) ++ "WHILE\n" ++ (print_exp (spaces+2) cond) ++ (print_exp (spaces+2) exp)
-print_exp spaces (Exp_Func tokens exp) = (sp spaces) ++ "FUNC\n" ++ (sp $ spaces+2) ++ (show $ head tokens) ++ "\n" ++ (sp $ spaces+2) ++ (show $ tail tokens) ++ "\n" ++ (print_exp (spaces+2) exp)
--- print_exp spaces (Exp_Call (token:[]) es) = (sp spaces) ++ "CALL\n" ++ (sp (spaces+2)) ++ (show token) ++ (print_exp (spaces+2) es) -- wrong
+print_exp spaces (Exp_Func name args body) = (sp spaces) ++ "FUNC\n" ++ (print_exp (spaces+2) name) ++ (foldr (\ exp str -> (print_exp (spaces+2) exp) ++ str) "" args) ++ (print_exp (spaces+2) body)
 print_exp spaces (Exp_Plus e1 e2) = (sp spaces) ++ "PLUS\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_Minus e1 e2) = (sp spaces) ++ "MINUS\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_Mult e1 e2) = (sp spaces) ++ "MULT\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
@@ -143,6 +145,7 @@ print_exp spaces (Exp_ArrIndex e1 e2) = (sp spaces) ++ "ARR_INDEX\n" ++ (print_e
 print_exp spaces (Exp_ArrCreate e1) = (sp spaces) ++ "ARR_CREATE\n" ++ (print_exp (spaces+2) e1)
 print_exp spaces (Exp_Value e1) = (sp spaces) ++ "VALUE\n" ++ (print_exp (spaces+2) e1)
 print_exp spaces (Exp_Int i) = (sp spaces) ++ (show i) ++ "\n"
+print_exp spaces (Exp_Float i) = (sp spaces) ++ (show i) ++ "\n"
 print_exp spaces (Exp_String s) = (sp spaces) ++ (s) ++ "\n"
 print_exp spaces (Exp_Empty) = (sp spaces) ++ "EMPTY\n"
 print_exp spaces (Exp_SourceBlock es) = (sp spaces) ++ "SOURCE BLOCK\n" ++ foldr (\e str -> (print_exp (spaces+2) e) ++ str) "" es
@@ -151,11 +154,11 @@ integerP :: Parser Char e Expression
 integerP = Exp_Int <$> read <$> spanP isDigit
 
 floatP :: Parser Char e Expression
-floatP = do
+floatP = Trace.trace "" $ do
   a <- spanP isDigit
-  dot <- charP '.'
+  charP '.'
   b <- spanP isDigit
-  let f = read (a ++ [dot] ++ b)
+  let f = read (a ++ "." ++ b)
   return $ Exp_Float $ f
 
 numP :: Eq e => Parser Char e Expression
@@ -195,6 +198,18 @@ binaryOperatorP next_op ops = do
         nexts <-  next_parser <|> nop []
         return ((operator, operand):nexts)
 
+sepParserBy :: Eq e => Parser Char e Expression -> Parser Char e a -> Parser Char e [Expression]
+sepParserBy parser separator = do
+  first <- parser
+  rest <- exprs <|> nop []
+  return (first:rest)
+  where
+    exprs = do
+      sep <- separator
+      expr <- parser
+      rest <- exprs <|> nop []
+      return $ (expr:rest)  
+
 ifP :: Eq e => Parser Char e Expression
 ifP = do
   wss $ stringP "if"
@@ -219,6 +234,17 @@ whileP = do
   body <- parseBlock <|> statementP
   return $ Exp_While cond body
 
+funcP :: Eq e => Parser Char e Expression
+funcP = do
+  ws *> stringP "func"
+  satisfyP isSpace
+  func_name <- wss $ wordP
+  wss $ charP '('
+  args <- sepParserBy wordP (wss $ charP ',')
+  wss $ charP ')'
+  body <- parseBlock <|> statementP
+  return $ Exp_Func func_name args body
+
 parseBlock :: Eq e => Parser Char e Expression
 parseBlock = do
   wss $ charP '{'
@@ -227,19 +253,24 @@ parseBlock = do
   return src
 
 parseSource :: Eq e => Parser Char e Expression
-parseSource = Exp_SourceBlock <$> do
-  first <- statementP
-  rest <- exprs <|> nop []
-  return (first:rest)
-  where
-    exprs = do
-      expr <- statementP
-      rest <- exprs <|> nop []
-      return $ (expr:rest)
+parseSource = Exp_SourceBlock <$> sepParserBy (controlStructureP <|> expressionP) (wss $ charP ';')
+-- parseSource :: Eq e => Parser Char e Expression
+-- parseSource = Exp_SourceBlock <$> do
+--   first <- statementP
+--   rest <- exprs <|> nop []
+--   return (first:rest)
+--   where
+--     exprs = do
+--       expr <- statementP
+--       rest <- exprs <|> nop []
+--       return $ (expr:rest)
 
 statementP :: Eq e => Parser Char e Expression
-statementP = ifP <|> whileP <|> (expressionP <* (wss $ charP ';'))
-  
+statementP = (controlStructureP <|> expressionP)
+
+controlStructureP :: Eq e => Parser Char e Expression
+controlStructureP = ifP <|> whileP <|> funcP
+
 expressionP :: Eq e => Parser Char e Expression
 expressionP = do
   (head operators) <|> nop Exp_Empty
@@ -268,8 +299,6 @@ parseFinal = numP <|> wordP <|> parensP
       return exp
 
 runParser :: (Show e, Eq e) => Parser Char e Expression -> String -> IO ()
-runParser parser input = putStrLn $ case parser.run input_obj of
-                           Right (exp, rest) -> ((print_exp 0 exp) ++ "\nrest:\n" ++ (show rest))
+runParser parser input = putStrLn $ case parser.run $ Input {str=input, pos=0} of
+                           Right (exp, rest) -> ((show exp) ++ "\nrest:\n" ++ (show rest))
                            Left err -> show err
-  where
-    input_obj = Input {str=input, pos=0}

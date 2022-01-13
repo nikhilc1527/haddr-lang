@@ -31,12 +31,10 @@ import Control.Monad.State
 import Control.Monad
 import Control.Applicative
 import Data.Foldable
-import System.IO
-import System.Process
 
 import qualified Debug.Trace as Trace
 
-data Operand = Register String | Variable String | Literal Int deriving (Show)
+data Operand = Register String | Addr String | Literal Int deriving (Show)
 reg = Register
 
 data Instruction =
@@ -58,11 +56,18 @@ data Instruction =
   Syscall
   deriving (Show)
 
-type Compiler = Expression -> State (Int, Map.Map String Int) [Instruction]
+data CompilerState =
+  CompilerState
+  {
+    counter :: Int,
+    symtab :: Map.Map String Int,
+    max :: Int
+  }
+type Compiler = Expression -> State CompilerState [Instruction]
 
 printOperand :: Operand -> String
 printOperand (Register s) = s
-printOperand (Variable i) = ""
+printOperand (Addr s) = s
 printOperand (Literal i) = show i
 
 printInstrs :: [Instruction] -> String
@@ -83,13 +88,21 @@ printInstrs ((Label s):rest) = s ++ ":\n" ++ (printInstrs rest)
 
 compile :: Compiler
 compile (Exp_Int i) = return [Mov (Register "rax") (Literal i)]
+compile (Exp_String varname) = do
+  state <- get
+  let var = Map.lookup varname state.symtab
+  case var of
+    (Just pos) -> do
+      return $
+        [Mov (Register "rax") (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]"))]
+    (Nothing) -> error $ "variable " ++ varname ++ " does not exist"
 compile (Exp_Plus e1 e2) = do
   a <- compile e1
   case e2 of
     (Exp_Int i) -> do
       return $ a <> [Add (Register "rax") (Literal i)]
-    (Exp_String s) -> do
-      return $ a <> [Add (Register "rax") (Variable s)]
+    -- (Exp_String s) -> do
+    --   return $ a <> [Add (Register "rax") (Addr s)]
     _ -> do
       b <- compile e2
       return $
@@ -103,8 +116,8 @@ compile (Exp_Minus e1 e2) = do
   case e2 of
     (Exp_Int i) -> do
       return $ a <> [Sub (Register "rax") (Literal i)]
-    (Exp_String s) -> do
-      return $ a <> [Sub (Register "rax") (Variable s)]
+    -- (Exp_String s) -> do
+    --   return $ a <> [Sub (Register "rax") (Variable s)]
     _ -> do
       b <- compile e2
       return $
@@ -161,20 +174,72 @@ compile (Exp_If cond_exp true_exp false_exp) = do
   cond_instrs <- compile cond_exp
   true_instrs <- compile true_exp
   false_instrs <- compile false_exp
-  modify incIfCounter
-  (counter, _) <- get
+  modify incCounter
+  state <- get
+  let label1 = ("ELSE" ++ (show state.counter))
+  let label2 = ("END" ++ (show state.counter))
   return $
     cond_instrs <>
     [Cmp (Register "rax") (Literal 0),
-     Je $ ("ELSE" ++ (show counter))] <>
+     Je label1] <>
     true_instrs <>
-    [Jmp $ ("END" ++ (show counter)),
-     Label $ ("ELSE" ++ (show counter))] <>
+    [Jmp label2,
+     Label label1] <>
     false_instrs <>
-    [Label $ ("END" ++ (show counter))]
+    [Label label2]
     where
-      incIfCounter :: (Int, Map.Map String Int) -> (Int, Map.Map String Int)
-      incIfCounter (a, b) = (a+1, b)
+      incCounter :: CompilerState -> CompilerState
+      incCounter a = a {counter = a.counter + 1}
+
+compile (Exp_While cond_exp body_exp) = do
+  cond_instrs <- compile cond_exp
+  body_instrs <- compile body_exp
+  modify incCounter
+  state <- get
+  let label1 = ("LOOP_START" ++ (show state.counter))
+  let label2 = ("LOOP_END" ++ (show state.counter))
+  return $
+    [Label label1] <>
+    cond_instrs <>
+    [Cmp (Register "rax") (Literal 0),
+     Je label2] <>
+    body_instrs <>
+    [Jmp label1,
+     Label label2]
+    where
+      incCounter :: CompilerState -> CompilerState
+      incCounter a = a {counter = a.counter + 1}
+compile (Exp_Assignment left_exp right_exp) = do
+  let varname = case left_exp of
+                  (Exp_String s) -> s
+                  _ -> error "only have variable names on lhs" -- TODO: allow array indexing, etc on lhs
+  rhs <- compile right_exp
+  state <- get
+  let var = Map.lookup varname state.symtab
+  case var of
+    (Just pos) -> do
+      return $
+        rhs <>
+        [Mov (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]")) (Register "rax")]
+    (Nothing) -> error "variable doesnt exist"-- do
+      -- state <- get
+      -- put $ state {symtab = Map.insert varname (state.max+8) state.symtab, max = state.max+8}
+      -- return $
+      --   rhs <>
+      --   [Push $ Register "rax"]
+
+compile (Exp_Declaration varname typename rhs_exp) = do
+  rhs <- compile rhs_exp
+  state <- get
+  let var = Map.lookup varname state.symtab
+  case var of
+    (Just pos) -> error "variable doesnt exist"
+    (Nothing) -> do
+      let pos = state.max + 8
+      put $ state {symtab = Map.insert varname pos state.symtab, max = pos}
+      return $
+        rhs <>
+        [Mov (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]")) (Register "rax")]
 
 compile (Exp_SourceBlock []) = return []
 compile (Exp_SourceBlock (exp:exprs)) = do
@@ -182,18 +247,3 @@ compile (Exp_SourceBlock (exp:exprs)) = do
   b <- compile $ Exp_SourceBlock exprs
   return $ a ++ b
 
-parseAndCompileExp :: String -> IO ()
-parseAndCompileExp str = do
-  let is = instrs str
-  handle <- openFile "/mnt/sda2/Nikhil/projects/asm_testing/main.asm" WriteMode
-  hPutStr handle initial_part
-  hPutStr handle is
-  hPutStr handle final_part
-  hFlush handle
-  let process = (shell "make -B -s && ./main") {cwd = Just "/mnt/sda2/Nikhil/projects/asm_testing/"}
-  output <- readCreateProcess process ""
-  putStr output
-  where
-    instrs = printInstrs . ((flip evalState) (0, Map.empty)) . compile . either (const Exp_Empty) (fst) . (statementP :: Parser Char (Error Char String) Expression).run . (flip Input) 0
-    initial_part = "global main\nextern printi\n\nsection .text\n\nmain:\n\tpush rbp\n\tmov rbp, rsp\n\n"
-    final_part = "\n\tmov rdi, rax\n\tcall printi\n\n\tpop rbp\n\n\tmov rax, 0\n\tret\n"

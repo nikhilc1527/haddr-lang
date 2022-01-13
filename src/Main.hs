@@ -8,10 +8,51 @@ import qualified Data.Map as Map
 import qualified System.Process as Process
 import qualified Debug.Trace as Trace
 
+import System.IO
+import System.Process
+import System.Directory
+import Control.Concurrent
+import Control.Monad.State
+
 import Lexer
 import Parser2
 import Interpreter2
 import Compiler
+
+dumpASM :: String -> IO()
+dumpASM str = do
+  let is = instrs str
+  let asm = initial_part ++ is ++ final_part
+  putStr asm
+  where
+    instrs = printInstrs . ((flip evalState) $ CompilerState 0 Map.empty 0) . compile . either (const Exp_Empty) (fst) . (parseSource :: Parser Char (Error Char String) Expression).run . (flip Input) 0
+    initial_part = "global main\nextern printi\n\nsection .text\n\nmain:\n\tpush rbp\n\tmov rbp, rsp\n\n"
+    final_part = "\n\tmov rdi, rax\n\tcall printi\n\n\tpop rbp\n\n\tmov rax, 0\n\tret\n"
+parseAndCompileExp :: String -> IO ()
+parseAndCompileExp str = do
+  let is = instrs str
+  handle <- openFile "compilation_out/main.asm" WriteMode
+  hPutStr handle initial_part
+  hPutStr handle is
+  hPutStr handle final_part
+  hFlush handle
+  let process = (shell "make -B -s && ./main") {cwd = Just "compilation_out/"}
+  (_, stdout_handle, _, proc_handle) <- createProcess process
+  -- threadDelay 10000
+  forkIO $ do
+    threadDelay 1000000
+    terminateProcess proc_handle
+  waitForProcess proc_handle
+  null <- openFile "/dev/null" ReadMode
+  output <- hGetContents $ maybe null id stdout_handle
+  putStr output
+  removeFile "compilation_out/main"
+  removeFile "compilation_out/main.asm"
+  removeFile "compilation_out/main.o"
+  where
+    instrs = printInstrs . ((flip evalState) $ CompilerState 0 Map.empty 0) . compile . either (const Exp_Empty) (fst) . (parseSource :: Parser Char (Error Char String) Expression).run . (flip Input) 0
+    initial_part = "global main\nextern printi\n\nsection .text\n\nmain:\n\tpush rbp\n\tmov rbp, rsp\n\n"
+    final_part = "\n\tmov rdi, rax\n\tcall printi\n\n\tpop rbp\n\n\tmov rax, 0\n\tret\n"
 
 interpret_text :: String -> IO ()
 interpret_text text = return ()

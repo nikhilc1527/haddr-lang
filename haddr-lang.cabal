@@ -39,7 +39,9 @@ executable haddr-lang
                       array,
                       vector,
                       split,
-                      mtl
+                      mtl,
+                      directory
+                      
     other-modules:
                       Lexer,
                       Parser2, 

@@ -110,6 +110,7 @@ data Expression =
   Exp_Or Expression Expression |
   Exp_Dump Expression |
   Exp_Assignment Expression Expression |
+  Exp_Declaration String String Expression |
   Exp_ArrIndex Expression Expression |
   Exp_ArrCreate Expression |
   Exp_Value Expression |
@@ -141,6 +142,7 @@ print_exp spaces (Exp_And e1 e2) = (sp spaces) ++ "AND\n" ++ (print_exp (spaces+
 print_exp spaces (Exp_Or e1 e2) = (sp spaces) ++ "OR\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_Dump e1) = (sp spaces) ++ "DUMP\n" ++ (print_exp (spaces+2) e1)
 print_exp spaces (Exp_Assignment e1 e2) = (sp spaces) ++ "ASSIGNMENT\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+print_exp spaces (Exp_Declaration varname typename e) = (sp spaces) ++ "DECLARATION\n" ++ (sp $ spaces+2) ++ varname ++ "\n" ++ (print_exp (spaces+2) e)
 print_exp spaces (Exp_ArrIndex e1 e2) = (sp spaces) ++ "ARR_INDEX\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_ArrCreate e1) = (sp spaces) ++ "ARR_CREATE\n" ++ (print_exp (spaces+2) e1)
 print_exp spaces (Exp_Value e1) = (sp spaces) ++ "VALUE\n" ++ (print_exp (spaces+2) e1)
@@ -173,8 +175,8 @@ tryParse def parser = Parser $ \input ->
                                    Left err -> return (def, input)
                                    Right a -> Right a
 
-wordP :: Parser Char e Expression
-wordP = Exp_String <$> spanP isAlpha
+wordP :: Parser Char e String
+wordP = spanP isAlpha
 
 -- white space surround
 wss :: Parser Char e a -> Parser Char e a
@@ -238,9 +240,9 @@ funcP :: Eq e => Parser Char e Expression
 funcP = do
   ws *> stringP "func"
   satisfyP isSpace
-  func_name <- wss $ wordP
+  func_name <- wss $ (Exp_String <$> wordP)
   wss $ charP '('
-  args <- sepParserBy wordP (wss $ charP ',')
+  args <- sepParserBy (Exp_String <$> wordP) (wss $ charP ',')
   wss $ charP ')'
   body <- parseBlock <|> statementP
   return $ Exp_Func func_name args body
@@ -253,23 +255,22 @@ parseBlock = do
   return src
 
 parseSource :: Eq e => Parser Char e Expression
-parseSource = Exp_SourceBlock <$> sepParserBy (controlStructureP <|> expressionP) (wss $ charP ';')
--- parseSource :: Eq e => Parser Char e Expression
--- parseSource = Exp_SourceBlock <$> do
---   first <- statementP
---   rest <- exprs <|> nop []
---   return (first:rest)
---   where
---     exprs = do
---       expr <- statementP
---       rest <- exprs <|> nop []
---       return $ (expr:rest)
+parseSource = Exp_SourceBlock <$> sepParserBy (controlStructureP <|> declarationP <|> expressionP) (wss $ charP ';')
 
 statementP :: Eq e => Parser Char e Expression
 statementP = (controlStructureP <|> expressionP)
 
 controlStructureP :: Eq e => Parser Char e Expression
 controlStructureP = ifP <|> whileP <|> funcP
+
+declarationP :: Eq e => Parser Char e Expression
+declarationP = do
+  varname <- wordP
+  wss $ charP ':'
+  typename <- wordP
+  wss $ charP '='
+  exp <- expressionP
+  return $ Exp_Declaration varname typename exp
 
 expressionP :: Eq e => Parser Char e Expression
 expressionP = do
@@ -290,7 +291,7 @@ expressionP = do
       operators = foldr (\ ops_list new_ops -> let op = binaryOperatorP (head new_ops) ops_list in (op:new_ops)) [parseFinal] operators_raw
 
 parseFinal :: Eq e => Parser Char e Expression
-parseFinal = numP <|> wordP <|> parensP
+parseFinal = numP <|> (Exp_String <$> wordP) <|> parensP
   where
     parensP = do
       _ <- ws *> charP '(' <* ws

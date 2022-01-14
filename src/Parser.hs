@@ -1,317 +1,304 @@
 module Parser where
 
-import Lexer
-
 import Data.Bool
+import Data.List
+import Data.Char
 import Data.Data
 import Data.List.Split
 import qualified Debug.Trace as Trace
 import Data.Hashable
 import Text.Printf
 import qualified Data.HashMap as Map
+import Control.Applicative
 
-type TypeID = Integer
+data Type = 
+  Type_Int
+  | Type_String
+  | Type_Bool
+  | Type_Pointer
+  | Type_Func
 
-typeID_INT = 1
-typeID_STRING = 2
-typeID_BOOL = 3
-typeID_POINTER = 4
-typeID_FUNC = 5
+-- type ExprID = Int
+-- data Expression = Expression ExprID [Expression] [TokenType]
+--   deriving (Eq, Ord, Show)
 
-type ExprID = Int
-data Expression = Expression ExprID [Expression] [TokenType]
-  deriving (Eq, Ord, Show)
+data Error i e
+  = EndOfInput  -- Expected more input, but there is nothing
+  | Unexpected i  -- We didn't expect to find this element
+  | CustomError e  -- Extra errors the user may want to create
+  | Empty  -- Used in `Alternative` implementation of `empty`
+  deriving (Eq, Show)
 
--- instance Show Expression
---   where
---     show (Expression id exprs toks) = printf "(%d %s)" id $ bool (show exprs) (show $ head toks) $ length toks > 0
+data Input i = Input
+  { str :: [i],
+    pos :: Int
+  } deriving (Show, Eq)
 
-expID_INVALID    = -1
-expID_IF         = 0
-expID_WHILE      = 1
-expID_FUNC       = 2
-expID_CALL       = 3
-expID_PLUS       = 4
-expID_MINUS      = 5
-expID_MULT       = 6
-expID_DIV        = 7
-expID_MOD        = 8
-expID_DOUBLE_EQ  = 9
-expID_LT         = 10
-expID_GT         = 11
-expID_AND        = 12
-expID_OR         = 13
-expID_DUMP       = 14
-expID_UNARY      = 15
-expID_VALUE      = 16
-expID_LHS        = 17
-expID_ARR_CREAT  = 18
-expID_ARR_ASSIGN = 19
-expID_ASSIGNMENT = 20
-expID_SRCBLOCK   = 21
-expID__          = 22
+newtype Parser i e a = Parser
+  { run :: Input i -> Either [Error i e] (a, Input i)
+  }
 
+instance Functor (Parser i e) where
+  fmap f (Parser p) = Parser $ \input -> do
+    (output, rest) <- p input
+    return (f output, rest)
+
+instance Applicative (Parser i e) where
+  pure a = Parser $ \is -> Right (a, is)
+  (Parser a) <*> (Parser b) = Parser $ \input -> do
+    (f, r1) <- a input
+    (x, r2) <- b r1
+    return (f x, r2)
+
+instance (Eq i, Eq e) => Alternative (Parser i e) where
+  empty = Parser $ const $ Left [Empty]
+
+  Parser l <|> Parser r = Parser $ \input ->
+    case l input of
+      Left err ->
+        case r input of
+          Left err' -> Left $ err'
+          Right (output, rest) -> Right (output, rest)
+      Right (output, rest) -> Right (output, rest)
+
+instance Monad (Parser i e) where
+  return = pure
+
+  Parser p >>= k = Parser $ \input -> do
+    (output, rest) <- p input
+    (k output).run rest
+
+satisfyP :: (i -> Bool) -> Parser i e i
+satisfyP pred = Parser $ \input ->
+  case input.str of
+    [] -> Left [EndOfInput]
+    hd : rest
+      | pred hd -> Right (hd, input { str = rest, pos = input.pos + 1 } )
+      | otherwise    -> Left [Unexpected hd]
+
+charP :: Eq i => i -> Parser i e i
+charP i = satisfyP (== i)
+
+stringP :: Eq i => [i] -> Parser i e [i]
+stringP = sequenceA . map charP
+
+spanP :: Eq i => (i -> Bool) -> Parser i e [i]
+spanP pred = Parser $ \input ->
+  let (a, b) = span (pred) input.str
+  in case a of
+       [] -> case b of
+              [] -> Left [EndOfInput]
+              (x:xs) -> Left [Unexpected x]
+       _ -> Right (a, input { str = b, pos = input.pos+(length a) } )
+
+data Expression =
+  Exp_If Expression Expression Expression |
+  Exp_While Expression Expression |
+  Exp_Func Expression [Expression] Expression |
+  Exp_Call Expression [Expression] |
+  Exp_Plus Expression Expression |
+  Exp_Minus Expression Expression |
+  Exp_Mult Expression Expression |
+  Exp_Div Expression Expression |
+  Exp_Mod Expression Expression |
+  Exp_Equality Expression Expression |
+  Exp_LessThan Expression Expression |
+  Exp_GreaterThan Expression Expression |
+  Exp_And Expression Expression |
+  Exp_Or Expression Expression |
+  Exp_Dump Expression |
+  Exp_Assignment Expression Expression |
+  Exp_Declaration String String Expression |
+  Exp_ArrIndex Expression Expression |
+  Exp_ArrCreate Expression |
+  Exp_Value Expression |
+  Exp_Int Int |
+  Exp_Float Float |
+  Exp_String String |
+  Exp_SourceBlock [Expression] |
+  Exp_Empty |
+  Exp_INVALID
+  deriving (Eq)
+
+instance Show Expression where
+  show = print_exp 0
+
+sp :: Int -> String
+sp = (flip replicate) ' '
 print_exp :: Int -> Expression -> String
-print_exp spaces (Expression exprID exprs tokens)
-  | expID__ /= 22 = error "Print Expression not exhaustive handling"
-  | exprID == expID_IF          = let (cond:e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "IF\n"  ++ (print_exp (spaces+2) cond) ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-  | exprID == expID_WHILE       = let (cond:e1:[]) = exprs in (take spaces $ repeat ' ') ++ "WHILE\n"  ++ (print_exp (spaces+2) cond) ++ (print_exp (spaces+2) e1)
-  | exprID == expID_FUNC        = let (body:[]) = exprs  in (take spaces $ repeat ' ') ++ "FUNC\n"  ++ (take (spaces+2) $ repeat ' ') ++ (show $ head $ tokens) ++ "\n" ++ (take (spaces+2) $ repeat ' ') ++ (show $ tail $ tokens) ++ "\n" ++ (print_exp (spaces+2) $ head exprs)
-  | exprID == expID_PLUS        = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "PLUS\n"  ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-  | exprID == expID_MINUS       = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "MINUS\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-  | exprID == expID_MULT        = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "MULT\n"  ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-  | exprID == expID_DIV         = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "DIV\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-  | exprID == expID_MOD         = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "MOD\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-  | exprID == expID_LT          = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "LT\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-  | exprID == expID_GT          = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "GT\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-  | exprID == expID_DOUBLE_EQ   = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "EQUALITY\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-  | exprID == expID_AND         = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "AND\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-  | exprID == expID_OR          = let (e1:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "OR\n"   ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-  | exprID == expID_DUMP        = let (e1:[])    = exprs in (take spaces $ repeat ' ') ++ "DUMP\n" ++ (print_exp (spaces+2) e1)
-  | exprID == expID_ARR_CREAT   = let (e1:[])    = exprs in (take spaces $ repeat ' ') ++ "ARR CREAT\n" ++ (print_exp (spaces+2) e1)
-  | exprID == expID_ASSIGNMENT  = let (lhs:e2:[]) = exprs in (take spaces $ repeat ' ') ++ "ASSIGNMENT\n" ++ (print_exp (spaces+2) lhs) ++ (print_exp (spaces+2) e2)
-  | exprID == expID_ARR_ASSIGN  = let
-                                    (ind:after:[]) = exprs
-                                    ((TOK_USERDEF name):[]) = tokens
-                                  in
-                                    (take spaces $ repeat ' ') ++ "ARR ASSIGNMENT\n" ++
-                                    (take (spaces+2) $ repeat ' ') ++ "NAME\n" ++ (take (spaces+4) $ repeat ' ') ++ (show name) ++ "\n" ++ 
-                                    (take (spaces+2) $ repeat ' ') ++ "INDEX\n" ++ (print_exp (spaces+4) ind) ++ 
-                                    (take (spaces+2) $ repeat ' ') ++ "VALUE\n" ++ (print_exp (spaces+4) after)
-  | exprID == expID_LHS         = let (t1:[]) = tokens in (take spaces $ repeat ' ') ++ (show t1) ++ "\n"
-  | exprID == expID_VALUE =
-      if | length exprs > 0 ->
-             let
-               (t1:[]) = tokens
-               (e:[]) = exprs
-             in
-               (take spaces $ repeat ' ') ++ (show t1) ++ "\n" ++ (take spaces $ repeat ' ') ++ "INDEX\n" ++ (print_exp (spaces+2) e)
-         | True -> let (t1:[]) = tokens in (take spaces $ repeat ' ') ++ (show t1) ++ "\n"
-     
-  | exprID == expID_SRCBLOCK    = (take spaces $ repeat ' ') ++ "SOURCE BLOCK\n" ++ (foldl (++) "" $ map (print_exp (spaces+2)) exprs)
-  | exprID == expID_CALL        = (take spaces $ repeat ' ') ++ "FUNC CALL\n" ++ (take (spaces+2) $ repeat ' ') ++ (show $ head tokens) ++ "\n" ++ (foldl (++) "" $ map (print_exp (spaces+2)) exprs)
-  | exprID == expID_INVALID     = "\n" ++ (take spaces $ repeat ' ') ++ "--- INVALID EXPR ---\n" ++ "\n"
-  | True                        = error "could not identify type of expression while printing"
+print_exp spaces (Exp_If cond exp_true exp_false) = (sp spaces) ++ "IF\n" ++ (print_exp (spaces+2) cond) ++ (print_exp (spaces+2) exp_true) ++ (print_exp (spaces+2) exp_false)
+print_exp spaces (Exp_While cond exp) = (sp spaces) ++ "WHILE\n" ++ (print_exp (spaces+2) cond) ++ (print_exp (spaces+2) exp)
+print_exp spaces (Exp_Func name args body) = (sp spaces) ++ "FUNC\n" ++ (print_exp (spaces+2) name) ++ (foldr (\ exp str -> (print_exp (spaces+2) exp) ++ str) "" args) ++ (print_exp (spaces+2) body)
+print_exp spaces (Exp_Plus e1 e2) = (sp spaces) ++ "PLUS\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+print_exp spaces (Exp_Minus e1 e2) = (sp spaces) ++ "MINUS\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+print_exp spaces (Exp_Mult e1 e2) = (sp spaces) ++ "MULT\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+print_exp spaces (Exp_Div e1 e2) = (sp spaces) ++ "DIV\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+print_exp spaces (Exp_Mod e1 e2) = (sp spaces) ++ "MOD\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+print_exp spaces (Exp_LessThan e1 e2) = (sp spaces) ++ "LT\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+print_exp spaces (Exp_GreaterThan e1 e2) = (sp spaces) ++ "GT\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+print_exp spaces (Exp_And e1 e2) = (sp spaces) ++ "AND\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+print_exp spaces (Exp_Or e1 e2) = (sp spaces) ++ "OR\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+print_exp spaces (Exp_Dump e1) = (sp spaces) ++ "DUMP\n" ++ (print_exp (spaces+2) e1)
+print_exp spaces (Exp_Assignment e1 e2) = (sp spaces) ++ "ASSIGNMENT\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+print_exp spaces (Exp_Declaration varname typename e) = (sp spaces) ++ "DECLARATION\n" ++ (sp $ spaces+2) ++ varname ++ "\n" ++ (print_exp (spaces+2) e)
+print_exp spaces (Exp_ArrIndex e1 e2) = (sp spaces) ++ "ARR_INDEX\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+print_exp spaces (Exp_ArrCreate e1) = (sp spaces) ++ "ARR_CREATE\n" ++ (print_exp (spaces+2) e1)
+print_exp spaces (Exp_Value e1) = (sp spaces) ++ "VALUE\n" ++ (print_exp (spaces+2) e1)
+print_exp spaces (Exp_Int i) = (sp spaces) ++ (show i) ++ "\n"
+print_exp spaces (Exp_Float i) = (sp spaces) ++ (show i) ++ "\n"
+print_exp spaces (Exp_String s) = (sp spaces) ++ (s) ++ "\n"
+print_exp spaces (Exp_Empty) = (sp spaces) ++ "EMPTY\n"
+print_exp spaces (Exp_SourceBlock es) = (sp spaces) ++ "SOURCE BLOCK\n" ++ foldr (\e str -> (print_exp (spaces+2) e) ++ str) "" es
 
-invalid_parse :: (Expression, [TokenType])
-invalid_parse = (Expression expID_INVALID [] [], [])
+integerP :: Parser Char e Expression
+integerP = Exp_Int <$> read <$> spanP isDigit
 
-insideBlock = untilClose [TOK_DO] [TOK_END] 1
+floatP :: Parser Char e Expression
+floatP = Trace.trace "" $ do
+  a <- spanP isDigit
+  charP '.'
+  b <- spanP isDigit
+  let f = read (a ++ "." ++ b)
+  return $ Exp_Float $ f
 
--- params:  opening tokens, closing tokens, initial stack amount (default 1), tokens to get
--- returns: list of tokens inside, list of tokens outside (not including closing token)
-untilClose :: [TokenType] -> [TokenType] -> Int -> [TokenType] -> ([TokenType], [TokenType])
-untilClose opening closing stack tokens
-  | null tokens                                 = error "unable to find closing tokens"
-  | head tokens `elem` closing && stack == 1 = ([], tail tokens)
-  | head tokens `elem` closing               = let (a, b) = untilClose opening closing (stack-1) $ tail $ tokens in ([head tokens] ++ a, b)
-  | head tokens `elem` opening               = let (a, b) = untilClose opening closing (stack+1) $ tail $ tokens in ([head tokens] ++ a, b)
-  | True                                     = let (a, b) = untilClose opening closing ( stack ) $ tail $ tokens in ([head tokens] ++ a, b)
+numP :: Eq e => Parser Char e Expression
+numP = (floatP) <|> (integerP)
 
-parseL0 :: [TokenType] -> (Expression, [TokenType]) -- returns maybe a syntax tree of expression or nothing if couldnt parse, and if could parse then the 
-parseL0 [] = invalid_parse
-parseL0 _
-  | expID__ /= 22 = error "Parse Expression not exhaustive handling"
--- dump operator
--- . <expr>
-parseL0 (TOK_DUMP:tokens_0)
-  | True = ((Expression expID_DUMP [next_val] []), symtab2)
+ws :: Parser Char e String
+ws = Parser $ \input -> Right $ let (a, b) = span isSpace input.str in (a, Input {str=b, pos=input.pos + (length a)})
+
+tryParse :: a -> Parser i e a -> Parser i e a
+tryParse def parser = Parser $ \input ->
+                                 case parser.run input of
+                                   Left err -> return (def, input)
+                                   Right a -> Right a
+
+wordP :: Parser Char e String
+wordP = spanP isAlpha
+
+-- white space surround
+wss :: Parser Char e a -> Parser Char e a
+wss parser = ws *> parser <* ws
+
+nop :: a -> Parser Char e a
+nop a = Parser $ \input -> Right $ (a, input)
+
+type BinOpT = Expression -> Expression -> Expression
+
+binaryOperatorP :: Eq e => (Parser Char e Expression) -> [(String, BinOpT)] -> (Parser Char e Expression)
+binaryOperatorP next_op ops = do
+  initial <- next_op
+  nexts <- next_parser <|> nop []
+  return $ foldl (\ expr (operator, next_operand) -> operator expr next_operand) initial nexts
     where
-      (next_val, symtab2) = parseL0 tokens_0
--- function declaration
--- func <name> <param...> do <body> end
-parseL0 (TOK_FUNC:tokens_0) = ((Expression expID_FUNC [body_parsed] args), rest_tokens)
+      operator_func = foldr (<|>) empty $ map (\(op_str, operator_func) -> const operator_func <$> (wss $ stringP op_str)) ops
+      next_parser = do
+        operator <- operator_func
+        operand <- next_op
+        nexts <-  next_parser <|> nop []
+        return ((operator, operand):nexts)
+
+sepParserBy :: Eq e => Parser Char e Expression -> Parser Char e a -> Parser Char e [Expression]
+sepParserBy parser separator = do
+  first <- parser
+  rest <- exprs <|> nop []
+  return (first:rest)
   where
-    funcname    = head tokens_0
-    args        = takeWhile (/= TOK_DO) $ tokens_0
-    (body_tokens, rest_tokens) = untilClose [TOK_IF, TOK_WHILE, TOK_FUNC] [TOK_END] 1 $ tail $ dropWhile (/= TOK_DO) $ tokens_0
-    body_parsed = parseSource body_tokens
--- if statement
--- if <cond> do <body> else <body> end
-parseL0 (TOK_IF:tokens_0)
-  | cond_1_id == expID_INVALID        = invalid_parse
-  | expr_true_2_id == expID_INVALID   = invalid_parse
-  | expr_false_3_id == expID_INVALID  = invalid_parse
-  | True = (Expression expID_IF [cond_1, expr_true_2, expr_false_3] [], tokens_3)
+    exprs = do
+      sep <- separator
+      expr <- parser
+      rest <- exprs <|> nop []
+      return $ (expr:rest)  
+
+ifP :: Eq e => Parser Char e Expression
+ifP = do
+  wss $ stringP "if"
+  wss $ charP '('
+  cond <- expressionP
+  wss $ charP ')'
+  inside <- parseBlock <|> statementP
+  else_block <- else_parser <|> nop Exp_Empty
+  return $ Exp_If cond inside else_block
+    where
+      else_parser = do
+        wss $ stringP "else"
+        inside <- parseBlock <|> statementP
+        return inside
+
+whileP :: Eq e => Parser Char e Expression
+whileP = do
+  wss $ stringP "while"
+  wss $ charP '('
+  cond <- expressionP
+  wss $ charP ')'
+  body <- parseBlock <|> statementP
+  return $ Exp_While cond body
+
+procP :: Eq e => Parser Char e Expression
+procP = do
+  ws *> stringP "proc"
+  satisfyP isSpace
+  func_name <- wss $ (Exp_String <$> wordP)
+  wss $ charP '('
+  args <- sepParserBy (Exp_String <$> wordP) (wss $ charP ',')
+  wss $ charP ')'
+  body <- parseBlock <|> statementP
+  return $ Exp_Func func_name args body
+
+parseBlock :: Eq e => Parser Char e Expression
+parseBlock = Exp_SourceBlock <$> (wss $ charP '{' *> block)
+    where
+      block = do
+        cur <- controlStructureP <|> (expressionP <* (wss $ charP ';'))
+        rest <- block <|> (const [] <$> (wss $ charP '}'))
+        return $ (cur:rest)
+
+statementP :: Eq e => Parser Char e Expression
+statementP = (controlStructureP <|> expressionP)
+
+controlStructureP :: Eq e => Parser Char e Expression
+controlStructureP = ifP <|> whileP <|> funcP
+
+declarationP :: Eq e => Parser Char e Expression
+declarationP = do
+  varname <- wordP
+  wss $ charP ':'
+  typename <- wordP
+  wss $ charP '='
+  exp <- expressionP
+  return $ Exp_Declaration varname typename exp
+
+expressionP :: Eq e => Parser Char e Expression
+expressionP = do
+  (head operators) <|> nop Exp_Empty
+    where
+      operators_raw = [
+        -- highest precedence
+        [(("="), Exp_Assignment)],
+        [("||", Exp_Or)],
+        [("&&", Exp_And)],
+        [("==", Exp_Equality)],
+        [("<", Exp_LessThan), (">", Exp_GreaterThan), ("==", Exp_Equality)],
+        [("+", Exp_Plus), ("-", Exp_Minus)],
+        [("*", Exp_Mult), ("/", Exp_Div), ("%", Exp_Mod)]
+        -- least precedence
+        ]
+      operators :: Eq e => [Parser Char e Expression]
+      operators = foldr (\ ops_list new_ops -> let op = binaryOperatorP (head new_ops) ops_list in (op:new_ops)) [parseFinal] operators_raw
+
+parseFinal :: Eq e => Parser Char e Expression
+parseFinal = numP <|> (Exp_String <$> wordP) <|> parensP
   where
-    (cond_tokens, tokens_1)        = untilClose [TOK_IF, TOK_WHILE, TOK_FUNC] [TOK_DO] 1 tokens_0
-    cond_1                         = parseSource $ cond_tokens -- parse the condition, which should be everything inside of 'if' and 'do'
-    (Expression cond_1_id cond_1_exprs cond_1_tokens) = cond_1
+    parensP = do
+      _ <- ws *> charP '(' <* ws
+      exp <- expressionP
+      _ <- ws *> charP ')' <* ws
+      return exp
 
-    (expr_true_tokens, tokens_2)   = untilClose [TOK_IF] [TOK_ELSE] 1 tokens_1
-    expr_true_2                         = parseSource $ expr_true_tokens -- parse the expression that happens if the condition is true
-    (Expression expr_true_2_id expr_true_2_exprs expr_true_2_tokens) = expr_true_2
 
-    (expr_false_tokens, tokens_3)  = untilClose [TOK_IF, TOK_WHILE, TOK_FUNC] [TOK_END] 1 tokens_2
-    expr_false_3                         = parseSource $ expr_false_tokens -- parse the expression that happens if the condition is false
-    (Expression expr_false_3_id expr_false_3_exprs expr_false_3_tokens) = expr_false_3
--- while loop
--- while <cond> do <body> end
-parseL0 (TOK_WHILE:tokens_0)
-  | cond_1_id == expID_INVALID = invalid_parse
-  | expr_2_id == expID_INVALID = invalid_parse
-  | True = ((Expression expID_WHILE [cond_1, expr_2] []), tokens_2)
-  where
-    (cond_tokens, tokens_1)        = untilClose [TOK_IF, TOK_WHILE, TOK_FUNC] [TOK_DO] 1 $ tokens_0
-    cond_1                         = parseSource $ cond_tokens -- parse the condition, which should be everything inside of the if and the do
-    (Expression cond_1_id _ _) = cond_1
 
-    (expr_tokens, tokens_2)        = untilClose [TOK_IF, TOK_WHILE, TOK_FUNC] [TOK_END] 1 tokens_1
-    expr_2                         = parseSource $ expr_tokens -- parse the expression that happens if the condition is true
-    (Expression expr_2_id _ _) = expr_2
--- assignment
-parseL0 ((TOK_USERDEF x):TOK_SQUAREBRACKETOPEN:tokens)
-  | TOK_EQUALS `elem` tokens = res
-  where
-    (toks_inside, tokens2) = untilClose [TOK_SQUAREBRACKETOPEN] [TOK_SQUAREBRACKETCLOSE] 1 tokens
-    inside_exp = parseSource toks_inside
+runParser :: (Show e, Eq e) => Parser Char e Expression -> String -> IO ()
+runParser parser input = putStrLn $ case parser.run $ Input {str=input, pos=0} of
+                           Right (exp, rest) -> ((show exp) ++ "\nrest:\n" ++ (show rest))
+                           Left err -> show err
 
-    res = case tokens2 of
-      (TOK_EQUALS:tokens3) ->
-        let (e, tokens4) = parseL0 tokens3
-        in ((Expression expID_ARR_ASSIGN [inside_exp, e] [(TOK_USERDEF x)]), tokens4)
-      tokens3 -> ((Expression expID_VALUE [inside_exp] [(TOK_USERDEF x)]), tokens3)
-parseL0 ((TOK_USERDEF x):tokens)
-  | TOK_EQUALS `elem` tokens = ((Expression expID_ASSIGNMENT [(Expression expID_LHS [] [(TOK_USERDEF x)]), afterEqExp] []), tokens_1)
-  -- | TOK_EQUALS `elem` tokens && lhs_all_userdef = ((Expression expID_ASSIGNMENT [(Expression expID_LHS [] beforeEq), afterEqExp] []), tokens_1)
-  -- | TOK_EQUALS `elem` tokens                    = error ("not all userdefs before assignment operator: " ++ (show tokens))
-  where
-    beforeEq = [TOK_USERDEF x] ++ (takeWhile (/= TOK_EQUALS) $ tokens)
-    lhs_all_userdef = foldl (&&) True (map (\x ->
-                                              case x of
-                                                TOK_USERDEF a -> True
-                                                _ -> False) beforeEq)
-    afterEq  = tail $ dropWhile (/= TOK_EQUALS) tokens
-    (afterEqExp, tokens_1) = parseL0 afterEq
--- function call
-parseL0 ((TOK_USERDEF x):TOK_PARENOPEN:tokens) = ((Expression expID_CALL args [TOK_USERDEF x]), rest)
-  where
-    (arg_tokens,rest) = untilClose [TOK_PARENOPEN] [TOK_PARENCLOSE] 1 tokens
-    args = map parseSource $ splitWhen (== TOK_COMMA) arg_tokens
-parseL0 ((TOK_SQUAREBRACKETOPEN):tokens) = ((Expression expID_ARR_CREAT [inside_exp] []), rest)
-  where
-    (inside, rest) = untilClose [TOK_SQUAREBRACKETOPEN] [TOK_SQUAREBRACKETCLOSE] 1 tokens
-    inside_exp = parseSource inside
--- indexing
--- arr[<expr>]
--- parseL0 ((TOK_USERDEF x):TOK_SQUAREBRACKETOPEN:tokens) = ((Expression expID_INDEX args [TOK_USERDEF x]), rest)
---   where
---     (arg_tokens,rest) = untilClose [TOK_SQUAREBRACKETOPEN] [TOK_SQUAREBRACKETCLOSE] 1 tokens
---     args = map parseSource $ splitWhen (== TOK_COMMA) arg_tokens
-parseL0 tokens = parseL1 $ tokens
-
--- takes [(operator token, operator expression)] 
-operatorParser :: [(TokenType, ExprID)] -> ([TokenType] -> (Expression, [TokenType])) -> [TokenType] -> (Expression, [TokenType])
-operatorParser operators next_parser [] = invalid_parse
-operatorParser operators next_parser tokens_0
-  | np_1_id == expID_INVALID = Trace.trace "getting invalid parse from next parse" $ invalid_parse
-  | null tokens_1       = (np_1, tokens_1)
-  | True                = get_all_ops np_1 tokens_1
-  where
-    -- np == next_parser
-    (np_1, tokens_1) = next_parser tokens_0
-    (Expression np_1_id _ _) = np_1
-    get_all_ops :: Expression -> [TokenType] -> (Expression, [TokenType])
-    get_all_ops prev_exp [] = (prev_exp, [])
-    get_all_ops prev_exp rest_tokens =
-      let
-        (np_2, tokens_2) = next_parser $ tail rest_tokens
-        
-        operatorMatch = filter (\ (token, exprID) -> head rest_tokens == token) operators
-        exprID = let (tokentype, expr) = head operatorMatch in expr
-        resultExp = Expression exprID [prev_exp, np_2] []
-        rest_ops = get_all_ops resultExp tokens_2
-      in
-        bool rest_ops (prev_exp, rest_tokens) (null operatorMatch)
-
-parseL1 = operatorParser [(TOK_AND, expID_AND), (TOK_OR, expID_OR)] parseL2
-
-parseL2 = operatorParser [(TOK_LT, expID_LT), (TOK_GT, expID_GT), (TOK_DOUBLE_EQUALS, expID_DOUBLE_EQ)] parseL3
-
-parseL3 = operatorParser [(TOK_PLUS, expID_PLUS), (TOK_MINUS, expID_MINUS)] parseL4
-
-parseL4 = operatorParser [(TOK_MULT, expID_MULT), (TOK_DIV, expID_DIV), (TOK_MOD, expID_MOD)] parseL5
-
-parseL5 = parseFinal
-
-parseFinal :: [TokenType] -> (Expression, [TokenType])
-parseFinal [] = invalid_parse
-parseFinal (TOK_LITERALNUM s:tokens_0)    = (Expression expID_VALUE [] [TOK_LITERALNUM s], tokens_0)
-parseFinal (TOK_LITERALSTRING s:tokens_0) = (Expression expID_VALUE [] [TOK_LITERALSTRING s], tokens_0)
--- ((Expression expID_VALUE [inside_exp] [(TOK_USERDEF x)]), tokens3)
-parseFinal ((TOK_USERDEF s):TOK_SQUAREBRACKETOPEN:tokens_0) = ((Expression expID_VALUE [inside_exp] [(TOK_USERDEF s)]), tokens2)
-  where
-    (toks_inside, tokens2) = untilClose [TOK_SQUAREBRACKETOPEN] [TOK_SQUAREBRACKETCLOSE] 1 tokens_0
-    inside_exp = parseSource toks_inside
-parseFinal (TOK_USERDEF s:tokens_0) = (Expression expID_VALUE [] [TOK_USERDEF s], rest)
-  where
-    getops :: [TokenType] -> ([Expression], [TokenType])
-    getops [] = ([], [])
-    getops tokens
-      | expID == expID_INVALID = ([], tokens)
-      | True                   = (next_parse:next_ops, rest_toks_2)
-       where
-        (next_parse, rest_toks) = parseFinal tokens
-        (Expression expID _ _)  = next_parse
-        (next_ops, rest_toks_2) = getops rest_toks
-    (exprs, rest) = getops tokens_0
-    -- value = Expression expID_VALUE [] toks
-    -- funccall = Expression expID_CALL [] toks
-    -- ret = bool funccall value (length toks == 1)
-parseFinal tokens_0
-  | head tokens_0 /= TOK_PARENOPEN    = invalid_parse
-  | insideParensParsed_id == expID_INVALID = invalid_parse
-  | True = (insideParensParsed, tokens_1)
-  where
-    (insideParens, tokens_1) = untilClose [TOK_PARENOPEN] [TOK_PARENCLOSE] 1 $ tail tokens_0
-    insideParensParsed = parseSource $ insideParens
-    (Expression insideParensParsed_id _ _) = insideParensParsed
-
--- input: full lexed source of the input program
--- output: either expID_SRCBLOCK for successfull parsing or expID_INVALID for invalid parsing
-parseSource :: [TokenType] -> Expression 
-parseSource [] = Expression expID_SRCBLOCK [] []
-parseSource tokens
-  | not $ null rest_first_tokens = error ("could not parse source " ++ (show first_stmt))
-  | True = Expression expID_SRCBLOCK (first_expr:exprs) []
-  where
-    (first_stmt, rest_tokens) = nextStatement tokens
-    (first_expr, rest_first_tokens) = parseL0 (first_stmt)
-    (Expression expID_SRCBLOCK exprs _) = parseSource rest_tokens
-
-getStatements :: [TokenType] -> [[TokenType]]
-getStatements [] = []
-getStatements tokens = a:(getStatements b)
-  where
-    (a, b) = nextStatement tokens
-
--- get the next statement delimited by a semicolon
--- parameters: tokens, current paren stack, current brackets stack, (first statement, rest of tokens)
--- nextStatement :: [TokenType] -> Int -> Int -> ([TokenType],[TokenType])
-nextStatement :: [TokenType] -> ([TokenType],[TokenType])
-nextStatement []                    = ([],[])
-nextStatement (TOK_SEMICOLON:rest)  = ([],rest)
-nextStatement (TOK_PARENOPEN:rest)  = 
-  let 
-    (inside, rest2) = untilClose [TOK_PARENOPEN] [TOK_PARENCLOSE] 1 rest
-    (statement, outside) = nextStatement rest2
-  in ([TOK_PARENOPEN] ++ inside ++ [TOK_PARENCLOSE] ++ statement, outside)
-nextStatement (TOK_IF:rest)  = 
-  let 
-    (inside, rest2) = untilClose [TOK_IF, TOK_WHILE, TOK_FUNC] [TOK_END] 1 rest
-    (statement, outside) = nextStatement rest2
-  in ([TOK_IF] ++ inside ++ [TOK_END] ++ statement, outside)
-nextStatement (TOK_WHILE:rest)  = 
-  let 
-    (inside, rest2) = untilClose [TOK_IF, TOK_WHILE, TOK_FUNC] [TOK_END] 1 rest
-    (statement, outside) = nextStatement rest2
-  in ([TOK_WHILE] ++ inside ++ [TOK_END] ++ statement, outside)
-nextStatement (TOK_FUNC:rest)  = 
-  let 
-    (inside, rest2) = untilClose [TOK_IF, TOK_WHILE, TOK_FUNC] [TOK_END] 1 rest
-    (statement, outside) = nextStatement rest2
-  in ([TOK_FUNC] ++ inside ++ [TOK_END] ++ statement, outside)
-nextStatement (x:rest)  = 
-  let 
-    (statement, outside) = nextStatement rest
-  in ([x] ++ statement, outside)

@@ -14,9 +14,7 @@ import System.Directory
 import Control.Concurrent
 import Control.Monad.State
 
-import Lexer
-import Parser2
-import Interpreter2
+import Parser
 import Compiler
 
 dumpASM :: String -> IO()
@@ -25,7 +23,7 @@ dumpASM str = do
   let asm = initial_part ++ is ++ final_part
   putStr asm
   where
-    instrs = printInstrs . ((flip evalState) $ CompilerState 0 Map.empty 0) . compile . either (const Exp_Empty) (fst) . (parseSource :: Parser Char (Error Char String) Expression).run . (flip Input) 0
+    instrs = printInstrs . ((flip evalState) $ CompilerState 0 Map.empty 0) . compile . either (const Exp_Empty) (fst) . (parseBlock :: Parser Char (Error Char String) Expression).run . (flip Input) 0
     initial_part = "global main\nextern printi\n\nsection .text\n\nmain:\n\tpush rbp\n\tmov rbp, rsp\n\n"
     final_part = "\n\tmov rdi, rax\n\tcall printi\n\n\tpop rbp\n\n\tmov rax, 0\n\tret\n"
 parseAndCompileExp :: String -> IO ()
@@ -50,7 +48,7 @@ parseAndCompileExp str = do
   removeFile "compilation_out/main.asm"
   removeFile "compilation_out/main.o"
   where
-    instrs = printInstrs . ((flip evalState) $ CompilerState 0 Map.empty 0) . compile . either (const Exp_Empty) (fst) . (parseSource :: Parser Char (Error Char String) Expression).run . (flip Input) 0
+    instrs = printInstrs . ((flip evalState) $ CompilerState 0 Map.empty 0) . compile . either (const Exp_Empty) (fst) . (parseBlock :: Parser Char (Error Char String) Expression).run . (flip Input) 0
     initial_part = "global main\nextern printi\n\nsection .text\n\nmain:\n\tpush rbp\n\tmov rbp, rsp\n\n"
     final_part = "\n\tmov rdi, rax\n\tcall printi\n\n\tpop rbp\n\n\tmov rax, 0\n\tret\n"
 

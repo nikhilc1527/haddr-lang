@@ -25,7 +25,7 @@ module Compiler where
 import qualified Data.Map as Map
 import Text.Printf
 
-import Parser2
+import Parser
 
 import Control.Monad.State
 import Control.Monad
@@ -61,7 +61,7 @@ data CompilerState =
   {
     counter :: Int,
     symtab :: Map.Map String Int,
-    max :: Int
+    rsp :: Int
   }
 type Compiler = Expression -> State CompilerState [Instruction]
 
@@ -209,6 +209,7 @@ compile (Exp_While cond_exp body_exp) = do
     where
       incCounter :: CompilerState -> CompilerState
       incCounter a = a {counter = a.counter + 1}
+
 compile (Exp_Assignment left_exp right_exp) = do
   let varname = case left_exp of
                   (Exp_String s) -> s
@@ -221,12 +222,7 @@ compile (Exp_Assignment left_exp right_exp) = do
       return $
         rhs <>
         [Mov (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]")) (Register "rax")]
-    (Nothing) -> error "variable doesnt exist"-- do
-      -- state <- get
-      -- put $ state {symtab = Map.insert varname (state.max+8) state.symtab, max = state.max+8}
-      -- return $
-      --   rhs <>
-      --   [Push $ Register "rax"]
+    (Nothing) -> error "variable doesnt exist"
 
 compile (Exp_Declaration varname typename rhs_exp) = do
   rhs <- compile rhs_exp
@@ -235,13 +231,16 @@ compile (Exp_Declaration varname typename rhs_exp) = do
   case var of
     (Just pos) -> error "variable doesnt exist"
     (Nothing) -> do
-      let pos = state.max + 8
-      put $ state {symtab = Map.insert varname pos state.symtab, max = pos}
+      let pos = state.rsp + 8
+      put $ state {symtab = Map.insert varname pos state.symtab, rsp = pos}
       return $
         rhs <>
-        [Mov (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]")) (Register "rax")]
+        [Mov (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]")) (Register "rax")] <>
+        [Sub (Register "rsp") (Literal 8)]
 
-compile (Exp_SourceBlock []) = return []
+compile (Exp_SourceBlock []) = do
+  state <- get
+  return $ [Add (Register "rsp") (Literal state.rsp)]
 compile (Exp_SourceBlock (exp:exprs)) = do
   a <- compile exp
   b <- compile $ Exp_SourceBlock exprs

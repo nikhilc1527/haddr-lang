@@ -63,6 +63,8 @@ data CompilerState =
     symtab :: Map.Map String Int,
     rsp :: Int
   }
+initialCompilerState :: CompilerState
+initialCompilerState = CompilerState 0 Map.empty 0
 type Compiler = Expression -> State CompilerState [Instruction]
 
 printOperand :: Operand -> String
@@ -214,29 +216,35 @@ compile (Exp_Assignment left_exp right_exp) = do
   let varname = case left_exp of
                   (Exp_String s) -> s
                   _ -> error "only have variable names on lhs" -- TODO: allow array indexing, etc on lhs
-  rhs <- compile right_exp
   state <- get
   let var = Map.lookup varname state.symtab
   case var of
     (Just pos) -> do
+      rhs <- compile right_exp
       return $
         rhs <>
         [Mov (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]")) (Register "rax")]
     (Nothing) -> error "variable doesnt exist"
 
 compile (Exp_Declaration varname typename rhs_exp) = do
-  rhs <- compile rhs_exp
   state <- get
   let var = Map.lookup varname state.symtab
   case var of
-    (Just pos) -> error "variable doesnt exist"
+    (Just pos) -> error "variable exists"
     (Nothing) -> do
       let pos = state.rsp + 8
       put $ state {symtab = Map.insert varname pos state.symtab, rsp = pos}
+      rhs <- compile rhs_exp
       return $
         rhs <>
         [Mov (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]")) (Register "rax")] <>
         [Sub (Register "rsp") (Literal 8)]
+
+compile (Exp_Func name args body) = case name of
+  (Exp_String name_s) -> do
+    body_instrs <- compile body
+    return $ [ Label name_s, Push $ Register "rbp", Mov (Register "rbp") (Register "rsp") ] <> body_instrs <> [ Mov (Register "rsp") (Register "rbp") ]
+  _ -> error "name of proc has to be string"
 
 compile (Exp_SourceBlock []) = do
   state <- get

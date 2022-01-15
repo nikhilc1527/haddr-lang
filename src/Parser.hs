@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleInstances #-}
+
 module Parser where
 
 import Data.Bool
@@ -10,6 +12,7 @@ import Data.Hashable
 import Text.Printf
 import qualified Data.HashMap as Map
 import Control.Applicative
+import Data.Either hiding (show)
 
 data Type = 
   Type_Int
@@ -22,73 +25,102 @@ data Type =
 -- data Expression = Expression ExprID [Expression] [TokenType]
 --   deriving (Eq, Ord, Show)
 
-data Error i e
+data Eq i => Error i
   = EndOfInput  -- Expected more input, but there is nothing
-  | Unexpected i  -- We didn't expect to find this element
-  | CustomError e  -- Extra errors the user may want to create
+  | Unexpected i Int -- We didn't expect to find this element
+  | Expected i [i] Int -- Expected <first i> but got <second i>
   | Empty  -- Used in `Alternative` implementation of `empty`
-  deriving (Eq, Show)
+  deriving (Eq)
+
+instance (Show i, Eq i) => Show (Error i) where
+  show EndOfInput = "end of input\n"
+  show (Unexpected i j) = "unexpected: " ++ (show i) ++ " at position " ++ (show j) ++ "\n"
+  show (Expected i j k) = "expected: " ++ (show i) ++ ", but got " ++ (show j) ++ " at position " ++ (show k) ++ "\n"
+
+instance Eq i => Ord (Error i) where
+  (EndOfInput) <= b = False
+  b <= EndOfInput = True
+  Empty <= b = True
+  b <= Empty = False
+
+  (Unexpected i a) <= (Unexpected j b) = a < b
+  (Expected i k a) <= (Unexpected j b) = a < b
+  (Unexpected i a) <= (Expected j l b) = a < b
+  (Expected i k a) <= (Expected j l b) = a < b
 
 data Input i = Input
   { str :: [i],
     pos :: Int
   } deriving (Show, Eq)
 
-newtype Parser i e a = Parser
-  { run :: Input i -> Either [Error i e] (a, Input i)
+newtype Parser i a = Parser
+  { run :: Input i -> Either (Error i) (a, Input i)
   }
 
-instance Functor (Parser i e) where
+instance Functor (Parser i) where
   fmap f (Parser p) = Parser $ \input -> do
     (output, rest) <- p input
     return (f output, rest)
 
-instance Applicative (Parser i e) where
+instance Applicative (Parser i) where
   pure a = Parser $ \is -> Right (a, is)
   (Parser a) <*> (Parser b) = Parser $ \input -> do
     (f, r1) <- a input
     (x, r2) <- b r1
     return (f x, r2)
 
-instance (Eq i, Eq e) => Alternative (Parser i e) where
-  empty = Parser $ const $ Left [Empty]
+instance (Eq i) => Alternative (Parser i) where
+  empty = Parser $ const $ Left $ Empty
 
   Parser l <|> Parser r = Parser $ \input ->
     case l input of
       Left err ->
         case r input of
-          Left err' -> Left $ err'
+          Left err' -> Left $ max err err'
           Right (output, rest) -> Right (output, rest)
       Right (output, rest) -> Right (output, rest)
 
-instance Monad (Parser i e) where
+instance Monad (Parser i) where
   return = pure
 
   Parser p >>= k = Parser $ \input -> do
     (output, rest) <- p input
     (k output).run rest
 
-satisfyP :: (i -> Bool) -> Parser i e i
+eofP :: Eq i => a -> Parser i a
+eofP a = Parser $ \input ->
+  case input.str of
+    [] -> Right (a, input)
+    (b:r) -> Left $ Unexpected b input.pos
+
+satisfyP :: Eq i => (i -> Bool) -> Parser i i
 satisfyP pred = Parser $ \input ->
   case input.str of
-    [] -> Left [EndOfInput]
+    [] -> Left EndOfInput
     hd : rest
       | pred hd -> Right (hd, input { str = rest, pos = input.pos + 1 } )
-      | otherwise    -> Left [Unexpected hd]
+      | otherwise    -> Left $ Unexpected hd input.pos
 
-charP :: Eq i => i -> Parser i e i
-charP i = satisfyP (== i)
+charP :: Char -> Parser Char Char 
+charP i = Parser $ \input ->
+  case input.str of
+    [] -> Left $ Expected i "EOF" input.pos
+    hd : rest
+      | hd == i -> Right (hd, input { str = rest, pos = input.pos + 1 } )
+      | otherwise    -> Left $ Expected i [hd] input.pos
 
-stringP :: Eq i => [i] -> Parser i e [i]
+wcharP = wss . charP
+
+stringP :: String -> Parser Char String
 stringP = sequenceA . map charP
 
-spanP :: Eq i => (i -> Bool) -> Parser i e [i]
+spanP :: Eq i => (i -> Bool) -> Parser i [i]
 spanP pred = Parser $ \input ->
   let (a, b) = span (pred) input.str
   in case a of
        [] -> case b of
-              [] -> Left [EndOfInput]
-              (x:xs) -> Left [Unexpected x]
+              [] -> Left $ EndOfInput
+              (x:xs) -> Left $ Unexpected x input.pos
        _ -> Right (a, input { str = b, pos = input.pos+(length a) } )
 
 data Expression =
@@ -150,10 +182,10 @@ print_exp spaces (Exp_String s) = (sp spaces) ++ (s) ++ "\n"
 print_exp spaces (Exp_Empty) = (sp spaces) ++ "EMPTY\n"
 print_exp spaces (Exp_SourceBlock es) = (sp spaces) ++ "SOURCE BLOCK\n" ++ foldr (\e str -> (print_exp (spaces+2) e) ++ str) "" es
 
-integerP :: Parser Char e Expression
+integerP :: Parser Char Expression
 integerP = Exp_Int <$> read <$> spanP isDigit
 
-floatP :: Parser Char e Expression
+floatP :: Parser Char Expression
 floatP = Trace.trace "" $ do
   a <- spanP isDigit
   charP '.'
@@ -161,44 +193,44 @@ floatP = Trace.trace "" $ do
   let f = read (a ++ "." ++ b)
   return $ Exp_Float $ f
 
-numP :: Eq e => Parser Char e Expression
+numP :: Parser Char Expression
 numP = (floatP) <|> (integerP)
 
-ws :: Parser Char e String
+ws :: Parser Char String
 ws = Parser $ \input -> Right $ let (a, b) = span isSpace input.str in (a, Input {str=b, pos=input.pos + (length a)})
 
-tryParse :: a -> Parser i e a -> Parser i e a
+tryParse :: a -> Parser i a -> Parser i a
 tryParse def parser = Parser $ \input ->
                                  case parser.run input of
                                    Left err -> return (def, input)
                                    Right a -> Right a
 
-wordP :: Parser Char e String
+wordP :: Parser Char String
 wordP = spanP isAlpha
 
 -- white space surround
-wss :: Parser Char e a -> Parser Char e a
+wss :: Parser Char a -> Parser Char a
 wss parser = ws *> parser <* ws
 
-nop :: a -> Parser Char e a
+nop :: a -> Parser Char a
 nop a = Parser $ \input -> Right $ (a, input)
 
-type BinOpT = Expression -> Expression -> Expression
-
-binaryOperatorP :: Eq e => (Parser Char e Expression) -> [(String, BinOpT)] -> (Parser Char e Expression)
+binaryOperatorP :: (Parser Char Expression) -> [Operator] -> (Parser Char Expression)
 binaryOperatorP next_op ops = do
   initial <- next_op
   nexts <- next_parser <|> nop []
   return $ foldl (\ expr (operator, next_operand) -> operator expr next_operand) initial nexts
     where
-      operator_func = foldr (<|>) empty $ map (\(op_str, operator_func) -> const operator_func <$> (wss $ stringP op_str)) ops
+      binop (Binary s op) = (s, op)
+      binop _ = error "expected binary operators"
+      operator_func = foldr (<|>) empty $ map (\op -> let (op_str, operator_func) = binop op in const operator_func <$> (wss $ stringP op_str)) ops
       next_parser = do
         operator <- operator_func
         operand <- next_op
         nexts <-  next_parser <|> nop []
         return ((operator, operand):nexts)
 
-sepParserBy :: Eq e => Parser Char e Expression -> Parser Char e a -> Parser Char e [Expression]
+sepParserBy :: Parser Char Expression -> Parser Char a -> Parser Char [Expression]
 sepParserBy parser separator = do
   first <- parser
   rest <- exprs <|> nop []
@@ -210,12 +242,12 @@ sepParserBy parser separator = do
       rest <- exprs <|> nop []
       return $ (expr:rest)  
 
-ifP :: Eq e => Parser Char e Expression
+ifP :: Parser Char Expression
 ifP = do
   wss $ stringP "if"
-  wss $ charP '('
+  wcharP '('
   cond <- expressionP
-  wss $ charP ')'
+  wcharP ')'
   inside <- parseBlock <|> statementP
   else_block <- else_parser <|> nop Exp_Empty
   return $ Exp_If cond inside else_block
@@ -225,55 +257,66 @@ ifP = do
         inside <- parseBlock <|> statementP
         return inside
 
-whileP :: Eq e => Parser Char e Expression
+whileP :: Parser Char Expression
 whileP = do
   wss $ stringP "while"
-  wss $ charP '('
+  wcharP '('
   cond <- expressionP
-  wss $ charP ')'
+  wcharP ')'
   body <- parseBlock <|> statementP
   return $ Exp_While cond body
 
-procP :: Eq e => Parser Char e Expression
+procP :: Parser Char Expression
 procP = do
   ws *> stringP "proc"
   satisfyP isSpace
   func_name <- wss $ (Exp_String <$> wordP)
-  wss $ charP '('
-  args <- sepParserBy (Exp_String <$> wordP) (wss $ charP ',')
-  wss $ charP ')'
+  args <- argsP
   body <- parseBlock <|> statementP
   return $ Exp_Func func_name args body
+    where
+      argsP :: Parser Char [Expression]
+      argsP = (wcharP '(') *> ((const [] <$> (wcharP ')') <|> (
+        do
+          cur <- Exp_String <$> wordP
+          rest <- argsP <|> (const [] <$> (wcharP ')'))
+          return $ (cur:rest)
+        )))
 
-parseBlock :: Eq e => Parser Char e Expression
-parseBlock = Exp_SourceBlock <$> (wss $ charP '{' *> block)
+parseBlock :: Parser Char Expression
+parseBlock = Exp_SourceBlock <$> (wcharP '{' *> block)
     where
       block = do
-        cur <- controlStructureP <|> (expressionP <* (wss $ charP ';'))
-        rest <- block <|> (const [] <$> (wss $ charP '}'))
+        cur <- controlStructureP <|> (expressionP <* (wcharP ';'))
+        rest <- block <|> (const [] <$> (wcharP '}'))
         return $ (cur:rest)
 
-statementP :: Eq e => Parser Char e Expression
-statementP = (controlStructureP <|> expressionP)
+statementP :: Parser Char Expression
+statementP = (controlStructureP <|> (expressionP <* (wcharP ';')))
 
-controlStructureP :: Eq e => Parser Char e Expression
-controlStructureP = ifP <|> whileP <|> funcP
+controlStructureP :: Parser Char Expression
+controlStructureP = ifP <|> whileP <|> procP
 
-declarationP :: Eq e => Parser Char e Expression
+declarationP :: Parser Char Expression
 declarationP = do
   varname <- wordP
-  wss $ charP ':'
+  wcharP ':'
   typename <- wordP
-  wss $ charP '='
+  wcharP '='
   exp <- expressionP
   return $ Exp_Declaration varname typename exp
 
-expressionP :: Eq e => Parser Char e Expression
+data Operator = 
+  PrefixUnary String (Expression -> Expression) |
+  PostfixUnary String (Expression -> Expression) |
+  Binary String (Expression -> Expression -> Expression) 
+
+expressionP :: Parser Char Expression
 expressionP = do
-  (head operators) <|> nop Exp_Empty
+  head operators
     where
       operators_raw = [
-        -- highest precedence
+        -- lowest precedence
         [(("="), Exp_Assignment)],
         [("||", Exp_Or)],
         [("&&", Exp_And)],
@@ -281,23 +324,28 @@ expressionP = do
         [("<", Exp_LessThan), (">", Exp_GreaterThan), ("==", Exp_Equality)],
         [("+", Exp_Plus), ("-", Exp_Minus)],
         [("*", Exp_Mult), ("/", Exp_Div), ("%", Exp_Mod)]
-        -- least precedence
+        -- highest precedence
         ]
-      operators :: Eq e => [Parser Char e Expression]
+      operators :: [Parser Char Expression]
       operators = foldr (\ ops_list new_ops -> let op = binaryOperatorP (head new_ops) ops_list in (op:new_ops)) [parseFinal] operators_raw
 
-parseFinal :: Eq e => Parser Char e Expression
+parseFinal :: Parser Char Expression
 parseFinal = numP <|> (Exp_String <$> wordP) <|> parensP
   where
     parensP = do
-      _ <- ws *> charP '(' <* ws
+      wcharP '('
       exp <- expressionP
-      _ <- ws *> charP ')' <* ws
+      wcharP ')'
       return exp
 
+sourceFileParser :: Parser Char [Expression]
+sourceFileParser = do
+  (wss $ eofP []) <|> do
+    cur <- procP <|> declarationP
+    next <- sourceFileParser
+    return (cur:next)
 
-
-runParser :: (Show e, Eq e) => Parser Char e Expression -> String -> IO ()
+runParser :: Parser Char Expression -> String -> IO ()
 runParser parser input = putStrLn $ case parser.run $ Input {str=input, pos=0} of
                            Right (exp, rest) -> ((show exp) ++ "\nrest:\n" ++ (show rest))
                            Left err -> show err

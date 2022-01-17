@@ -25,6 +25,8 @@ module Compiler where
 import qualified Data.Map as Map
 import Text.Printf
 
+import Data.Bool
+
 import Parser
 
 import Control.Monad.State
@@ -34,8 +36,8 @@ import Data.Foldable
 
 import qualified Debug.Trace as Trace
 
-data Operand = Register String | Addr String | Literal Int deriving (Show)
-reg = Register
+data Operand = Register String | Addr String | ProcName String | Literal Int deriving (Show)
+-- reg = Register
 
 data Instruction =
   Mov Operand Operand |
@@ -53,7 +55,8 @@ data Instruction =
   Return |
   Sub Operand Operand |
   Label String |
-  Syscall
+  Syscall |
+  Ret
   deriving (Show)
 
 data CompilerState =
@@ -71,6 +74,7 @@ printOperand :: Operand -> String
 printOperand (Register s) = s
 printOperand (Addr s) = s
 printOperand (Literal i) = show i
+printOperand (ProcName s) = s
 
 printInstrs :: [Instruction] -> String
 printInstrs [] = ""
@@ -85,8 +89,13 @@ printInstrs ((Pop e1):rest) = "\tpop " ++ (printOperand e1) ++ "\n" ++ (printIns
 printInstrs ((Je e1):rest) = "\tje " ++ e1 ++ "\n" ++ (printInstrs rest)
 printInstrs ((Jmp e1):rest) = "\tjmp " ++ e1 ++ "\n" ++ (printInstrs rest)
 printInstrs ((Label s):rest) = s ++ ":\n" ++ (printInstrs rest)
+printInstrs ((Ret):rest) = "\tret\n" ++ (printInstrs rest)
+printInstrs ((Call e1):rest) = "\tcall " ++ (printOperand e1) ++ "\n" ++ (printInstrs rest)
 
 -- movr2 a b = Mov (Register a) (Register b)
+
+incCounter :: CompilerState -> CompilerState
+incCounter a = a {counter = a.counter + 1}
 
 compile :: Compiler
 compile (Exp_Int i) = return [Mov (Register "rax") (Literal i)]
@@ -189,9 +198,6 @@ compile (Exp_If cond_exp true_exp false_exp) = do
      Label label1] <>
     false_instrs <>
     [Label label2]
-    where
-      incCounter :: CompilerState -> CompilerState
-      incCounter a = a {counter = a.counter + 1}
 
 compile (Exp_While cond_exp body_exp) = do
   cond_instrs <- compile cond_exp
@@ -208,9 +214,6 @@ compile (Exp_While cond_exp body_exp) = do
     body_instrs <>
     [Jmp label1,
      Label label2]
-    where
-      incCounter :: CompilerState -> CompilerState
-      incCounter a = a {counter = a.counter + 1}
 
 compile (Exp_Assignment left_exp right_exp) = do
   let varname = case left_exp of
@@ -240,11 +243,30 @@ compile (Exp_Declaration varname typename rhs_exp) = do
         [Mov (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]")) (Register "rax")] <>
         [Sub (Register "rsp") (Literal 8)]
 
-compile (Exp_Func name args body) = case name of
+compile (Exp_Proc name args body) = case name of
   (Exp_String name_s) -> do
     body_instrs <- compile body
-    return $ [ Label name_s, Push $ Register "rbp", Mov (Register "rbp") (Register "rsp") ] <> body_instrs <> [ Mov (Register "rsp") (Register "rbp") ]
+    return $ [ Label name_s, Push $ Register "rbp", Mov (Register "rbp") (Register "rsp") ] <> body_instrs <> [ Pop (Register "rbp"), Ret ]
   _ -> error "name of proc has to be string"
+
+compile (Exp_ProcCall name' args') = do
+  let name = (\e -> case e of
+                         Exp_String s -> s
+                         _ -> error $ "called name must be a string(for now)" ++ (show args')) name'
+  args_instrs <- process_args $ args'
+  modify $ (\st -> st { rsp = st.rsp - 8 * (length args') })
+  
+  return $ args_instrs <> (Pop <$> reverse args_registers) <> [Call $ ProcName name]
+    where
+      args_registers = take (length args') $ Register <$> ["rdi", "rsi", "rcx", "rdx"]
+
+      process_args :: [Expression] -> State CompilerState [Instruction]
+      process_args [] = return []
+      process_args (exp:exprs) = do
+        instrs <- compile exp
+        modify $ (\st -> st { rsp = st.rsp + 8 })
+        rest <- process_args exprs
+        return $ instrs <> [Push $ Register "rax"] <> rest
 
 compile (Exp_SourceBlock []) = do
   state <- get
@@ -254,3 +276,4 @@ compile (Exp_SourceBlock (exp:exprs)) = do
   b <- compile $ Exp_SourceBlock exprs
   return $ a ++ b
 
+compile e = error $ "unhandled expression: \n" ++ (print_exp 0 e)

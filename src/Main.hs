@@ -18,15 +18,26 @@ import Control.Monad.State
 import Parser
 import Compiler
 
-dumpASM :: String -> IO()
-dumpASM str = do
+dumpASMOfExpression :: String -> IO()
+dumpASMOfExpression str = do
   let is = instrs str
   let asm = initial_part ++ is ++ final_part
   putStr asm
   where
-    instrs = printInstrs . ((flip evalState) $ CompilerState 0 Map.empty 0) . compile . either (const Exp_Empty) (fst) . (parseBlock :: Parser Char Expression).run . (flip Input) 0
-    initial_part = "global main\nextern printi\n\nsection .text\n\nmain:\n\tpush rbp\n\tmov rbp, rsp\n\n"
-    final_part = "\n\tmov rdi, rax\n\tcall printi\n\n\tpop rbp\n\n\tmov rax, 0\n\tret\n"
+    instrs = printInstrs . ((flip evalState) $ initialCompilerState) . compile . either (\err -> error $ show err) (fst) . expressionP.run . (flip Input) 0
+    initial_part = "global _start\nextern printi\n\nsection .text\n\n"
+    final_part = "_start:\n\tpush rbp\n\tmov rbp, rsp\n\n\tcall main\n\tmov rdi, rax\n\tcall printi\n\n\tpop rbp\n\n\tmov rax, 60\n\tmov rdi, 0\n\tsyscall\n"
+
+dumpASMOfFile :: FilePath -> IO()
+dumpASMOfFile filepath = do
+  str <- readFile filepath
+  let is = instrs str
+  let asm = initial_part ++ is ++ final_part
+  putStr asm
+  where
+    instrs = fold . map (printInstrs . ((flip evalState) $ initialCompilerState) . compile) . either (\err -> error $ show err) (fst) . sourceFileParser.run . (flip Input) 0
+    initial_part = "global _start\nextern printi\n\nsection .text\n\n"
+    final_part = "_start:\n\tpush rbp\n\tmov rbp, rsp\n\n\tcall main\n\n\tpop rbp\n\n\tmov rax, 60\n\tmov rdi, 0\n\tsyscall\n"  
 
 parseAndCompileExp :: String -> IO ()
 parseAndCompileExp str = do
@@ -44,29 +55,45 @@ parseAndCompileExp str = do
     threadDelay 1000000
     terminateProcess proc_handle
   waitForProcess proc_handle
-  null <- openFile "/dev/null" ReadMode
-  output <- hGetContents $ maybe null id stdout_handle
+  nullfile <- openFile "/dev/null" ReadMode
+  output <- hGetContents $ maybe nullfile id stdout_handle
   putStr output
   removeFile "compilation_out/main"
   removeFile "compilation_out/main.asm"
   removeFile "compilation_out/main.o"
   where
-    instrs = printInstrs . ((flip evalState) $ CompilerState 0 Map.empty 0) . compile . either (const Exp_Empty) (fst) . (parseBlock :: Parser Char Expression).run . (flip Input) 0
+    instrs = printInstrs . ((flip evalState) $ CompilerState 0 Map.empty 0) . compile . either (const Exp_Empty) (fst) . (expressionP).run . (flip Input) 0
     initial_part = "global main\nextern printi\n\nsection .text\n\nmain:\n\tpush rbp\n\tmov rbp, rsp\n\n"
     final_part = "\n\tmov rdi, rax\n\tcall printi\n\n\tpop rbp\n\n\tmov rax, 0\n\tret\n"
 
 parseAndCompileFile :: FilePath -> IO ()
 parseAndCompileFile filepath = do
   handle <- openFile filepath ReadMode
-  contents <- hGetContents handle
-  let parsed = sourceFileParser.run $ Input contents 0
-  case parsed of
-    Left err -> do
-      putStrLn $ show err
-    Right (parsed_exp, _) -> do
-      let instrs = evalState (compile $ Exp_SourceBlock parsed_exp) initialCompilerState
-      let instrs_showed = printInstrs instrs
-      putStrLn $ instrs_showed
+  str <- hGetContents handle
+  let is = instrs str
+  handle <- openFile "compilation_out/main.asm" WriteMode
+  hPutStr handle initial_part
+  hPutStr handle is
+  hPutStr handle final_part
+  hFlush handle
+  hClose handle
+  let process = (shell "make -B -s && ./main") {cwd = Just "compilation_out/"}
+  (_, stdout_handle, _, proc_handle) <- createProcess process
+  -- threadDelay 10000
+  forkIO $ do
+    threadDelay 1000000
+    terminateProcess proc_handle
+  waitForProcess proc_handle
+  nullfile <- openFile "/dev/null" ReadMode
+  output <- hGetContents $ maybe nullfile id stdout_handle
+  putStr output
+  -- removeFile "compilation_out/main"
+  -- removeFile "compilation_out/main.asm"
+  -- removeFile "compilation_out/main.o"
+  where
+    instrs = fold . map (printInstrs . ((flip evalState) $ initialCompilerState) . compile) . either (\err -> error $ show err) (fst) . sourceFileParser.run . (flip Input) 0
+    initial_part = "global _start\nextern printi\n\nsection .text\n\n"
+    final_part = "_start:\n\tpush rbp\n\tmov rbp, rsp\n\n\tcall main\n\n\tpop rbp\n\n\tmov rax, 60\n\tmov rdi, 0\n\tsyscall\n"  
 
 -- if you want a nice repl experience use the readline library wrapper https://github.com/hanslub42/rlwrap
 -- repl :: IO()

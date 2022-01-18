@@ -1,12 +1,7 @@
-proc face() {
-  printi(1 + 5);
-}
-
 proc main() {
-  printi(1 + 3);
-  let a = 1;
-  face();
-  printi(a + 4);
-  a = a + 2;
-  printi(a + 4);
+  let i = 0;
+  while (i - 20) {
+    printi(i);
+    i = i + 1;
+  }
 }

@@ -3,42 +3,27 @@ extern printi
 
 section .text
 
-face:
-	push rbp
-	mov rbp, rsp
-	mov rax, 1
-	add rax, 5
-	push rax
-	pop rdi
-	call printi
-	add rsp, 0
-	pop rbp
-	ret
 main:
 	push rbp
 	mov rbp, rsp
-	mov rax, 1
-	add rax, 3
-	push rax
-	pop rdi
-	call printi
-	mov rax, 1
+	mov rax, 0
 	mov QWORD [rbp-8], rax
 	sub rsp, 8
-	call face
+LOOP_START1:
 	mov rax, QWORD [rbp-8]
-	add rax, 4
+	sub rax, 20
+	cmp rax, 0
+	je LOOP_END1
+	mov rax, QWORD [rbp-8]
 	push rax
 	pop rdi
 	call printi
 	mov rax, QWORD [rbp-8]
-	add rax, 2
+	add rax, 1
 	mov QWORD [rbp-8], rax
-	mov rax, QWORD [rbp-8]
-	add rax, 4
-	push rax
-	pop rdi
-	call printi
+	add rsp, 0
+	jmp LOOP_START1
+LOOP_END1:
 	add rsp, 8
 	pop rbp
 	ret

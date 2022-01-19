@@ -201,7 +201,10 @@ compile (Exp_If cond_exp true_exp false_exp) = do
 
 compile (Exp_While cond_exp body_exp) = do
   cond_instrs <- compile cond_exp
+  old_state <- (.rsp) <$> get
+  modify $ (\st -> st { rsp = 0 })
   body_instrs <- compile body_exp
+  modify $ (\st -> st { rsp = old_state })
   modify incCounter
   counter <- (.counter) <$> get
   let label1 = ("LOOP_START" ++ (show counter))

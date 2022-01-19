@@ -3,43 +3,78 @@ extern printi
 
 section .text
 
-face:
+testtwo:
 	push rbp
 	mov rbp, rsp
-	mov rax, 1
-	add rax, 5
+	push rdi
+	push rsi
+	push rcx
+	mov rax, QWORD [rbp-8]
 	push rax
-	pop rdi
-	call printi
+	mov rax, QWORD [rbp-16]
+	pop rbx
+	add rax, rbx
+	push rax
+	mov rax, QWORD [rbp-24]
+	pop rbx
+	add rax, rbx
+	add rax, 5
 	add rsp, 0
+	add rsp, 24
+	pop rbp
+	ret
+test:
+	push rbp
+	mov rbp, rsp
+	push rdi
+	push rsi
+	mov rax, QWORD [rbp-8]
+	push rax
+	mov rax, QWORD [rbp-16]
+	pop rbx
+	add rax, rbx
+	push rax
+	mov rax, QWORD [rbp-8]
+	push rax
+	mov rax, QWORD [rbp-16]
+	push rax
+	mov rax, 3
+	push rax
+	pop rcx
+	pop rsi
+	pop rdi
+	call testtwo
+	pop rbx
+	add rax, rbx
+	add rsp, 0
+	add rsp, 16
 	pop rbp
 	ret
 main:
 	push rbp
 	mov rbp, rsp
 	mov rax, 1
-	add rax, 3
+	push rax
+	mov rax, 2
+	push rax
+	pop rsi
+	pop rdi
+	call test
 	push rax
 	pop rdi
 	call printi
-	mov rax, 1
-	mov QWORD [rbp-8], rax
-	sub rsp, 8
-	call face
-	mov rax, QWORD [rbp-8]
-	add rax, 4
+	mov rax, 3
+	push rax
+	mov rax, 4
+	push rax
+	pop rsi
+	pop rdi
+	call test
 	push rax
 	pop rdi
 	call printi
-	mov rax, QWORD [rbp-8]
-	add rax, 2
-	mov QWORD [rbp-8], rax
-	mov rax, QWORD [rbp-8]
-	add rax, 4
-	push rax
-	pop rdi
-	call printi
-	add rsp, 8
+	add rsp, 0
+	add rsp, 0
 	pop rbp
 	ret
 _start:

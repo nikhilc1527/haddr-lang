@@ -1,0 +1,13 @@
+proc testtwo(a, b, c) {
+  a + b + c + 5;
+}
+
+proc test(a, b) {
+  a + b + testtwo(a, b, 3);
+}
+
+proc main() {
+  printi(test(1, 2));
+  printi(test(3, 4));
+}
+

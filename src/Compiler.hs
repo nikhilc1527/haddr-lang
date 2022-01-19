@@ -203,9 +203,9 @@ compile (Exp_While cond_exp body_exp) = do
   cond_instrs <- compile cond_exp
   body_instrs <- compile body_exp
   modify incCounter
-  state <- get
-  let label1 = ("LOOP_START" ++ (show state.counter))
-  let label2 = ("LOOP_END" ++ (show state.counter))
+  counter <- (.counter) <$> get
+  let label1 = ("LOOP_START" ++ (show counter))
+  let label2 = ("LOOP_END" ++ (show counter))
   return $
     [Label label1] <>
     cond_instrs <>
@@ -240,13 +240,25 @@ compile (Exp_Declaration varname typename rhs_exp) = do
       rhs <- compile rhs_exp
       return $
         rhs <>
-        [Mov (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]")) (Register "rax")] <>
-        [Sub (Register "rsp") (Literal 8)]
+        -- [Mov (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]")) (Register "rax")] <>
+        -- [Sub (Register "rsp") (Literal 8)]
+        [ Push $ Register "rax" ]
 
 compile (Exp_Proc name args body) = case name of
-  (Exp_String name_s) -> do
+  Exp_String name_s -> do
+    push_args_instrs <- push_args args args_registers
     body_instrs <- compile body
-    return $ [ Label name_s, Push $ Register "rbp", Mov (Register "rbp") (Register "rsp") ] <> body_instrs <> [ Pop (Register "rbp"), Ret ]
+    return $ [ Label name_s, Push $ Register "rbp", Mov (Register "rbp") (Register "rsp") ] <> push_args_instrs <> body_instrs <> [ Add (Register "rsp") (Literal $ 8 * (length args)) ] <> [ Pop (Register "rbp"), Ret ]
+      where
+        args_registers = take (length args) $ Register <$> ["rdi", "rsi", "rcx", "rdx"]
+        push_args :: [Expression] -> [Operand] -> State CompilerState [Instruction]
+        push_args [] [] = return [] 
+        push_args (arg:args) (reg:regs) = case arg of
+          (Exp_String arg_name) -> do
+            modify $ \st -> st { rsp = st.rsp + 8, symtab = Map.insert arg_name (st.rsp + 8) st.symtab }
+            rest <- push_args args regs
+            return $ [ Push reg ] <> rest
+          _ -> error "name of procedure argument has to be a string"
   _ -> error "name of proc has to be string"
 
 compile (Exp_ProcCall name' args') = do
@@ -254,7 +266,7 @@ compile (Exp_ProcCall name' args') = do
                          Exp_String s -> s
                          _ -> error $ "called name must be a string(for now)" ++ (show args')) name'
   args_instrs <- process_args $ args'
-  modify $ (\st -> st { rsp = st.rsp - 8 * (length args') })
+  -- modify $ (\st -> st { rsp = st.rsp + 8 * (length args') })
   
   return $ args_instrs <> (Pop <$> reverse args_registers) <> [Call $ ProcName name]
     where
@@ -266,14 +278,29 @@ compile (Exp_ProcCall name' args') = do
         instrs <- compile exp
         modify $ (\st -> st { rsp = st.rsp + 8 })
         rest <- process_args exprs
+        modify $ (\st -> st { rsp = st.rsp - 8 })
         return $ instrs <> [Push $ Register "rax"] <> rest
 
-compile (Exp_SourceBlock []) = do
-  state <- get
-  return $ [Add (Register "rsp") (Literal state.rsp)]
-compile (Exp_SourceBlock (exp:exprs)) = do
-  a <- compile exp
-  b <- compile $ Exp_SourceBlock exprs
-  return $ a ++ b
+-- compile (Exp_SourceBlock []) = do
+--   state <- get
+--   return $ [Add (Register "rsp") (Literal state.rsp)]
+-- compile (Exp_SourceBlock (exp:exprs)) = do
+--   a <- compile exp
+--   b <- compile $ Exp_SourceBlock exprs
+--   return $ a ++ b
+compile (Exp_SourceBlock exprs) = do
+  old_state <- get
+  instrs <- get_instrs exprs
+  new_state <- get
+  modify $ (\st -> st { rsp = old_state.rsp, symtab = old_state.symtab })
+  return $ instrs <> [ Add (Register "rsp") (Literal $ new_state.rsp - old_state.rsp) ]
+    where
+      get_instrs :: [Expression] -> State CompilerState [Instruction]
+      get_instrs (exp:exprs) = do
+        a <- compile exp
+        b <- get_instrs exprs
+        return $ a <> b
+      get_instrs [] = do
+        return []
 
 compile e = error $ "unhandled expression: \n" ++ (print_exp 0 e)

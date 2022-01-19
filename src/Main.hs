@@ -18,13 +18,23 @@ import Control.Monad.State
 import Parser
 import Compiler
 
+instrs :: String -> String
+instrs str = 
+  let
+    input = Input str 0
+    parsed_either =  sourceFileParser.run input
+    parsed = either (\err -> error $ show_err err str) (fst) $ parsed_either
+    compiled = (fold . map (printInstrs . ((flip evalState) $ initialCompilerState) . compile)) parsed
+  in
+    compiled
+-- instrs = fold . map (printInstrs . ((flip evalState) $ initialCompilerState) . compile) . either (\err -> error $ show err) (fst) . sourceFileParser.run . (flip Input) 0
+
 dumpASMOfExpression :: String -> IO()
 dumpASMOfExpression str = do
   let is = instrs str
   let asm = initial_part ++ is ++ final_part
   putStr asm
   where
-    instrs = printInstrs . ((flip evalState) $ initialCompilerState) . compile . either (\err -> error $ show err) (fst) . expressionP.run . (flip Input) 0
     initial_part = "global _start\nextern printi\n\nsection .text\n\n"
     final_part = "_start:\n\tpush rbp\n\tmov rbp, rsp\n\n\tcall main\n\tmov rdi, rax\n\tcall printi\n\n\tpop rbp\n\n\tmov rax, 60\n\tmov rdi, 0\n\tsyscall\n"
 
@@ -35,7 +45,7 @@ dumpASMOfFile filepath = do
   let asm = initial_part ++ is ++ final_part
   putStr asm
   where
-    instrs = fold . map (printInstrs . ((flip evalState) $ initialCompilerState) . compile) . either (\err -> error $ show err) (fst) . sourceFileParser.run . (flip Input) 0
+    -- instrs = fold . map (printInstrs . ((flip evalState) $ initialCompilerState) . compile) . either (\err -> error $ show err) (fst) . sourceFileParser.run . (flip Input) 0
     initial_part = "global _start\nextern printi\n\nsection .text\n\n"
     final_part = "_start:\n\tpush rbp\n\tmov rbp, rsp\n\n\tcall main\n\n\tpop rbp\n\n\tmov rax, 60\n\tmov rdi, 0\n\tsyscall\n"  
 
@@ -62,7 +72,6 @@ parseAndCompileExp str = do
   removeFile "compilation_out/main.asm"
   removeFile "compilation_out/main.o"
   where
-    instrs = printInstrs . ((flip evalState) $ CompilerState 0 Map.empty 0) . compile . either (const Exp_Empty) (fst) . (expressionP).run . (flip Input) 0
     initial_part = "global main\nextern printi\n\nsection .text\n\nmain:\n\tpush rbp\n\tmov rbp, rsp\n\n"
     final_part = "\n\tmov rdi, rax\n\tcall printi\n\n\tpop rbp\n\n\tmov rax, 0\n\tret\n"
 
@@ -91,7 +100,6 @@ parseAndCompileFile filepath = do
   -- removeFile "compilation_out/main.asm"
   -- removeFile "compilation_out/main.o"
   where
-    instrs = fold . map (printInstrs . ((flip evalState) $ initialCompilerState) . compile) . either (\err -> error $ show err) (fst) . sourceFileParser.run . (flip Input) 0
     initial_part = "global _start\nextern printi\n\nsection .text\n\n"
     final_part = "_start:\n\tpush rbp\n\tmov rbp, rsp\n\n\tcall main\n\n\tpop rbp\n\n\tmov rax, 60\n\tmov rdi, 0\n\tsyscall\n"  
 

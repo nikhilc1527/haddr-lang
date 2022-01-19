@@ -31,10 +31,26 @@ data Eq i => Error i
   | Empty  -- Used in `Alternative` implementation of `empty`
   deriving (Eq)
 
+get_srcpos :: Int -> String -> (Int, Int)
+get_srcpos pos str =
+  let
+    line = length $ filter (== '\n') $ take pos str
+    col = length $ takeWhile (/= '\n') $ reverse $ take pos str
+  in
+    (line+1, col+1)
+
+show_err :: (Show i, Eq i) => Error i -> String -> String
+show_err EndOfInput _ = "end of input\n"
+show_err (Unexpected i j) orig = let (row, col) = get_srcpos j orig in "unexpected: " ++ (show i) ++ " at position " ++ (show row) ++ ":" ++ (show col) ++ "\n"
+show_err (Expected i j k) orig = let (row, col) = get_srcpos k orig in "expected: " ++ (show i) ++ ", but got " ++ (show j) ++ " at position " ++ (show row) ++ ":" ++ (show col) ++ "\n"
+show_err Empty _ = undefined
+
+
 instance (Show i, Eq i) => Show (Error i) where
   show EndOfInput = "end of input\n"
   show (Unexpected i j) = "unexpected: " ++ (show i) ++ " at position " ++ (show j) ++ "\n"
   show (Expected i j k) = "expected: " ++ (show i) ++ ", but got " ++ (show j) ++ " at position " ++ (show k) ++ "\n"
+  show Empty = undefined
 
 instance Eq i => Ord (Error i) where
   (EndOfInput) <= b = False
@@ -206,7 +222,7 @@ numP :: Parser Char Expression
 numP = (floatP) <|> (integerP)
 
 ws :: Parser Char String
-ws = Parser $ \input -> Right $ let (a, b) = span isSpace input.str in (a, Input {str=b, pos=input.pos + (length a)})
+ws = Parser $ \input -> Right $ let (a, b) = span isSpace input.str in (a, input {str=b, pos=input.pos + (length a)})
 
 tryParse :: a -> Parser i a -> Parser i a
 tryParse def parser = Parser $ \input ->
@@ -305,20 +321,25 @@ whileP = do
 
 procP :: Parser Char Expression
 procP = do
-  ws *> stringP "proc"
-  satisfyP isSpace
+  ws *> stringP "proc "
   func_name <- wss $ (Exp_String <$> wordP)
-  args <- argsP
+  args <- (commas_to_list <$> expressionP) <|> (const [] <$> (wcharP '(' >> wcharP ')'))
   body <- parseBlock <|> statementP
   return $ Exp_Proc func_name args body
     where
-      argsP :: Parser Char [Expression]
-      argsP = (wcharP '(') *> ((const [] <$> (wcharP ')') <|> (
-        do
-          cur <- Exp_String <$> wordP
-          rest <- argsP <|> (const [] <$> (wcharP ')'))
-          return $ (cur:rest)
-        )))
+      commas_to_list :: Expression -> [Expression]
+      commas_to_list (Exp_Comma e1 e2) = ((commas_to_list e1) ++ [e2])
+      commas_to_list e = [e]
+
+      -- merge_commas :: Expression -> [Expression]
+      -- merge_commas (Exp_Comma a b) = a:(merge_commas b)
+      -- argsP :: Parser Char [Expression]
+      -- argsP = (wcharP '(') *> ((const [] <$> (wcharP ')') <|> (
+      --   do
+      --     cur <- Exp_String <$> wordP
+      --     rest <- argsP <|> (const [] <$> (wcharP ')'))
+      --     return $ (cur:rest)
+      --   )))
 
 parseBlock :: Parser Char Expression
 parseBlock = Exp_SourceBlock <$> (wcharP '{' *> block)
@@ -393,7 +414,7 @@ sourceFileParser = do
     return (cur:next)
 
 runParser :: Parser Char Expression -> String -> IO ()
-runParser parser input = putStrLn $ case parser.run $ Input {str=input, pos=0} of
+runParser parser input = putStrLn $ case parser.run $ Input input 0 of
                            Right (exp, rest) -> ((print_exp 0 exp) ++ "\nrest:\n" ++ (show rest))
                            Left err -> show err
 

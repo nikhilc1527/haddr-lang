@@ -1,0 +1,33 @@
+proc main() {
+  let i = 0;
+  while (i < 5) {
+    printi(i);
+    i = i + 1;
+  }
+
+  i = 10;
+  while (i <= 15) {
+    printi(i);
+    i = i + 1;
+  }
+
+  i = 25;
+  while (i > 20) {
+    printi(i);
+    i = i - 1;
+  }
+
+  i = 35;
+  while (i >= 30) {
+    printi(i);
+    i = i - 1;
+  }
+
+  i = 40;
+  while (i < 50) {
+    if (i == 45) {
+      printi(i);
+    }
+    i = i + 1;
+  }
+}

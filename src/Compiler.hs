@@ -1,25 +1,3 @@
--- func call:
--- push rbp
--- mov rbp, rsp
--- push arg1
--- push arg2
--- push arg3
--- call func
--- (inside func)
--- arg1 at [rbp-8]
--- arg2 at [rbp-16]
--- arg3 at [rbp-24]
--- var1 at [rbp-40]
--- var2 at [rbp-48]
--- var3 at [rbp-56]
--- pop
--- pop
--- pop
--- ret
--- pop
--- pop
--- pop
-
 module Compiler where
 
 import qualified Data.Map as Map
@@ -37,7 +15,6 @@ import Data.Foldable
 import qualified Debug.Trace as Trace
 
 data Operand = Register String | Addr String | ProcName String | Literal Int deriving (Show)
--- reg = Register
 
 data Instruction =
   Mov Operand Operand |
@@ -46,6 +23,8 @@ data Instruction =
   Cmp Operand Operand |
   Je String |
   Jmp String |
+  Jlt String |
+  Jle String |
   Div Operand |
   Mod Operand Operand |
   Interrupt Int |
@@ -88,11 +67,11 @@ printInstrs ((Push e1):rest) = "\tpush " ++ (printOperand e1) ++ "\n" ++ (printI
 printInstrs ((Pop e1):rest) = "\tpop " ++ (printOperand e1) ++ "\n" ++ (printInstrs rest)
 printInstrs ((Je e1):rest) = "\tje " ++ e1 ++ "\n" ++ (printInstrs rest)
 printInstrs ((Jmp e1):rest) = "\tjmp " ++ e1 ++ "\n" ++ (printInstrs rest)
+printInstrs ((Jlt e1):rest) = "\tjl " ++ e1 ++ "\n" ++ (printInstrs rest)
+printInstrs ((Jle e1):rest) = "\tjle " ++ e1 ++ "\n" ++ (printInstrs rest)
 printInstrs ((Label s):rest) = s ++ ":\n" ++ (printInstrs rest)
 printInstrs ((Ret):rest) = "\tret\n" ++ (printInstrs rest)
 printInstrs ((Call e1):rest) = "\tcall " ++ (printOperand e1) ++ "\n" ++ (printInstrs rest)
-
--- movr2 a b = Mov (Register a) (Register b)
 
 incCounter :: CompilerState -> CompilerState
 incCounter a = a {counter = a.counter + 1}
@@ -112,8 +91,6 @@ compile (Exp_Plus e1 e2) = do
   case e2 of
     (Exp_Int i) -> do
       return $ a <> [Add (Register "rax") (Literal i)]
-    -- (Exp_String s) -> do
-    --   return $ a <> [Add (Register "rax") (Addr s)]
     _ -> do
       b <- compile e2
       return $
@@ -127,8 +104,6 @@ compile (Exp_Minus e1 e2) = do
   case e2 of
     (Exp_Int i) -> do
       return $ a <> [Sub (Register "rax") (Literal i)]
-    -- (Exp_String s) -> do
-    --   return $ a <> [Sub (Register "rax") (Variable s)]
     _ -> do
       b <- compile e2
       return $
@@ -170,7 +145,94 @@ compile (Exp_Mod e1 e2) = do
     [Mov (Register "rdx") (Literal 0)] <>
     [Div (Register "rbx")] <>
     [Mov (Register "rax") (Register "rdx")]
-
+compile (Exp_LessThan e1 e2) = do
+  a <- compile e1
+  b <- compile e2
+  modify incCounter
+  counter <- (.counter) <$> get
+  let label1 = ("COMPARISON" ++ (show counter))
+  let label2 = ("COMPARISON_END" ++ (show counter))
+  return $ fold $ [
+    a,
+    [Push $ Register "rax"],
+    b,
+    [
+      Pop $ Register "rbx",
+      Cmp (Register "rbx") (Register "rax"),
+      Jlt $ label1,
+      Mov (Register "rax") (Literal 0),
+      Jmp label2,
+      Label label1, 
+      Mov (Register "rax") (Literal 1),
+      Label label2
+    ]
+    ]
+compile (Exp_GreaterEqual e1 e2) = do
+  a <- compile e1
+  b <- compile e2
+  modify incCounter
+  counter <- (.counter) <$> get
+  let label1 = ("COMPARISON" ++ (show counter))
+  let label2 = ("COMPARISON_END" ++ (show counter))
+  return $ fold $ [
+    a,
+    [Push $ Register "rax"],
+    b,
+    [
+      Pop $ Register "rbx",
+      Cmp (Register "rax") (Register "rbx"),
+      Jle $ label1,
+      Mov (Register "rax") (Literal 0),
+      Jmp label2,
+      Label label1, 
+      Mov (Register "rax") (Literal 1),
+      Label label2
+    ]
+    ]
+compile (Exp_LessEqual e1 e2) = do
+  a <- compile e1
+  b <- compile e2
+  modify incCounter
+  counter <- (.counter) <$> get
+  let label1 = ("COMPARISON" ++ (show counter))
+  let label2 = ("COMPARISON_END" ++ (show counter))
+  return $ fold $ [
+    a,
+    [Push $ Register "rax"],
+    b,
+    [
+      Pop $ Register "rbx",
+      Cmp (Register "rbx") (Register "rax"),
+      Jlt $ label1,
+      Mov (Register "rax") (Literal 0),
+      Jmp label2,
+      Label label1, 
+      Mov (Register "rax") (Literal 1),
+      Label label2
+    ]
+    ]
+compile (Exp_GreaterThan e1 e2) = do
+  a <- compile e1
+  b <- compile e2
+  modify incCounter
+  counter <- (.counter) <$> get
+  let label1 = ("COMPARISON" ++ (show counter))
+  let label2 = ("COMPARISON_END" ++ (show counter))
+  return $ fold $ [
+    a,
+    [Push $ Register "rax"],
+    b,
+    [
+      Pop $ Register "rbx",
+      Cmp (Register "rax") (Register "rbx"),
+      Jle $ label1,
+      Mov (Register "rax") (Literal 0),
+      Jmp label2,
+      Label label1, 
+      Mov (Register "rax") (Literal 1),
+      Label label2
+    ]
+    ]  
 {-
 cond_instrs
 cmp rax, 0
@@ -243,8 +305,6 @@ compile (Exp_Declaration varname typename rhs_exp) = do
       rhs <- compile rhs_exp
       return $
         rhs <>
-        -- [Mov (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]")) (Register "rax")] <>
-        -- [Sub (Register "rsp") (Literal 8)]
         [ Push $ Register "rax" ]
 
 compile (Exp_Proc name args body) = case name of
@@ -253,7 +313,7 @@ compile (Exp_Proc name args body) = case name of
     body_instrs <- compile body
     return $ [ Label name_s, Push $ Register "rbp", Mov (Register "rbp") (Register "rsp") ] <> push_args_instrs <> body_instrs <> [ Add (Register "rsp") (Literal $ 8 * (length args)) ] <> [ Pop (Register "rbp"), Ret ]
       where
-        args_registers = take (length args) $ Register <$> ["rdi", "rsi", "rcx", "rdx"]
+        args_registers = take (length args) $ Register <$> ["rdi", "rsi", "rcx", "rdx", "r8", "r9"]
         push_args :: [Expression] -> [Operand] -> State CompilerState [Instruction]
         push_args [] [] = return [] 
         push_args (arg:args) (reg:regs) = case arg of
@@ -269,7 +329,6 @@ compile (Exp_ProcCall name' args') = do
                          Exp_String s -> s
                          _ -> error $ "called name must be a string(for now)" ++ (show args')) name'
   args_instrs <- process_args $ args'
-  -- modify $ (\st -> st { rsp = st.rsp + 8 * (length args') })
   
   return $ args_instrs <> (Pop <$> reverse args_registers) <> [Call $ ProcName name]
     where
@@ -284,13 +343,6 @@ compile (Exp_ProcCall name' args') = do
         modify $ (\st -> st { rsp = st.rsp - 8 })
         return $ instrs <> [Push $ Register "rax"] <> rest
 
--- compile (Exp_SourceBlock []) = do
---   state <- get
---   return $ [Add (Register "rsp") (Literal state.rsp)]
--- compile (Exp_SourceBlock (exp:exprs)) = do
---   a <- compile exp
---   b <- compile $ Exp_SourceBlock exprs
---   return $ a ++ b
 compile (Exp_SourceBlock exprs) = do
   old_state <- get
   instrs <- get_instrs exprs
@@ -306,4 +358,16 @@ compile (Exp_SourceBlock exprs) = do
       get_instrs [] = do
         return []
 
+compile Exp_Empty = return $ []
+
 compile e = error $ "unhandled expression: \n" ++ (print_exp 0 e)
+
+sourceCompiler :: [Expression] -> [Instruction]
+sourceCompiler exprs = (flip evalState) initialCompilerState $ compile_all exprs
+  where
+    compile_all :: [Expression] -> State CompilerState [Instruction]
+    compile_all (e:es) = do
+      a <- compile e
+      b <- compile_all es
+      return $ a <> b
+    compile_all [] = return []

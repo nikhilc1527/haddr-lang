@@ -157,6 +157,8 @@ data Expression =
   Exp_Mod Expression Expression |
   Exp_Comma Expression Expression |
   Exp_Equality Expression Expression |
+  Exp_LessEqual Expression Expression |
+  Exp_GreaterEqual Expression Expression |
   Exp_LessThan Expression Expression |
   Exp_GreaterThan Expression Expression |
   Exp_And Expression Expression |
@@ -192,6 +194,8 @@ print_exp spaces (Exp_Div e1 e2) = (sp spaces) ++ "DIV\n" ++ (print_exp (spaces+
 print_exp spaces (Exp_Mod e1 e2) = (sp spaces) ++ "MOD\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_Comma e1 e2) = (sp spaces) ++ "COMMA\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_LessThan e1 e2) = (sp spaces) ++ "LT\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+print_exp spaces (Exp_GreaterEqual e1 e2) = (sp spaces) ++ "GE\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+print_exp spaces (Exp_LessEqual e1 e2) = (sp spaces) ++ "LE\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_GreaterThan e1 e2) = (sp spaces) ++ "GT\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_And e1 e2) = (sp spaces) ++ "AND\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_Or e1 e2) = (sp spaces) ++ "OR\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
@@ -206,6 +210,7 @@ print_exp spaces (Exp_Float i) = (sp spaces) ++ (show i) ++ "\n"
 print_exp spaces (Exp_String s) = (sp spaces) ++ (s) ++ "\n"
 print_exp spaces (Exp_Empty) = (sp spaces) ++ "EMPTY\n"
 print_exp spaces (Exp_SourceBlock es) = (sp spaces) ++ "SOURCE BLOCK\n" ++ foldr (\e str -> (print_exp (spaces+2) e) ++ str) "" es
+print_exp spaces e = error "unexhaustive print_exp: (" ++ (show e) ++ " )"
 
 integerP :: Parser Char Expression
 integerP = Exp_Int <$> read <$> spanP isDigit
@@ -331,16 +336,6 @@ procP = do
       commas_to_list (Exp_Comma e1 e2) = ((commas_to_list e1) ++ [e2])
       commas_to_list e = [e]
 
-      -- merge_commas :: Expression -> [Expression]
-      -- merge_commas (Exp_Comma a b) = a:(merge_commas b)
-      -- argsP :: Parser Char [Expression]
-      -- argsP = (wcharP '(') *> ((const [] <$> (wcharP ')') <|> (
-      --   do
-      --     cur <- Exp_String <$> wordP
-      --     rest <- argsP <|> (const [] <$> (wcharP ')'))
-      --     return $ (cur:rest)
-      --   )))
-
 parseBlock :: Parser Char Expression
 parseBlock = Exp_SourceBlock <$> (wcharP '{' *> block)
     where
@@ -388,7 +383,7 @@ expressionP = head operators
         BinaryOperatorList [(("="), Exp_Assignment)],
         BinaryOperatorList [("||", Exp_Or)],
         BinaryOperatorList [("&&", Exp_And)],
-        BinaryOperatorList [("<", Exp_LessThan), (">", Exp_GreaterThan), ("==", Exp_Equality)],
+        BinaryOperatorList [("<=", Exp_LessEqual), (">=", Exp_GreaterEqual), ("<", Exp_LessThan), (">", Exp_GreaterThan), ("==", Exp_Equality)],
         BinaryOperatorList [("+", Exp_Plus), ("-", Exp_Minus)],
         BinaryOperatorList [("*", Exp_Mult), ("/", Exp_Div), ("%", Exp_Mod)],
         FixedLevel 1

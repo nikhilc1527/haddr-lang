@@ -40,8 +40,8 @@ executable haddr-lang
                       vector,
                       split,
                       mtl,
-                      directory
-                      
+                      directory,
+                      optparse-applicative
     other-modules:
                       Parser,
                       Compiler

@@ -7,7 +7,10 @@ proc test(a, b) {
 }
 
 proc main() {
-  printi(test(1, 2));
-  printi(test(3, 4));
+  let i = 0;
+  while (i < 3) {
+    let j = test(1, 2);
+    printi(j);
+    i = i + 1;
+  }
 }
-

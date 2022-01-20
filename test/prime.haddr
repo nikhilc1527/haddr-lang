@@ -1,21 +1,21 @@
-func isprime i do
-      res = 1;
-      j = 2;
-      while j < i && res do
-            if i % j do 0
-            else
+proc isprime(i) {
+      let res = 1;
+      let j = 2;
+      while ((j < i) * res) {
+            if (i % j) 0;
+            else {
                 res = 0;
-            end;
+            }
             j = j + 1;
-      end;
-      res
-end;
+      }
+      res;
+}
 
-N = 1;
-while N < 10 do
-    i = isprime(N);
-    . N;
-    . i;
-    N = N + 1;
-end;
-0
+proc main() {
+     let n = 1;
+     while(n < 100) {
+         let res = isprime(n);
+         if (res) printi(n);
+         n = n + 1;
+     }
+}

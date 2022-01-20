@@ -1,8 +1,11 @@
-i = 12345;
-reverse = 0;
-while i do
-  reverse = reverse * 10;
-  reverse = reverse + i % 10;
-  i = i / 10;
-end;
-reverse
+proc main() {
+    let i = 12345;
+    printi(i);
+    let reverse = 0;
+    while (i) {
+        reverse = reverse * 10;
+        reverse = reverse + i % 10;
+        i = i / 10;
+    }
+    printi(reverse);
+}

@@ -1,6 +1,9 @@
-a = 1;
-b = 2;
-c = 3;
-d = 1;
-
-sum = a + b * c + d;
+proc main() {
+  let a = 1;
+  let b = 2;
+  let c = 3;
+  let d = 1;
+  
+  let sum = a + b * c + d;
+  printi(sum);
+}

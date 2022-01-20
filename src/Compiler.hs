@@ -17,6 +17,7 @@ import qualified Debug.Trace as Trace
 data Operand = Register String | Addr String | ProcName String | Literal Int deriving (Show)
 
 data Instruction =
+  Comment String |
   Mov Operand Operand |
   Add Operand Operand |
   Call Operand |
@@ -44,7 +45,8 @@ data CompilerState =
     counter :: Int,
     symtab :: Map.Map String Int,
     rsp :: Int
-  }
+  } deriving (Eq, Show)
+
 initialCompilerState :: CompilerState
 initialCompilerState = CompilerState 0 Map.empty 0
 type Compiler = Expression -> State CompilerState [Instruction]
@@ -57,6 +59,7 @@ printOperand (ProcName s) = s
 
 printInstrs :: [Instruction] -> String
 printInstrs [] = ""
+printInstrs ((Comment s):rest) = "\t;; " ++ s ++ "\n" ++ (printInstrs rest)
 printInstrs ((Mov e1 e2):rest) = "\tmov " ++ (printOperand e1) ++ ", " ++ (printOperand e2) ++ "\n" ++ (printInstrs rest)
 printInstrs ((Add e1 e2):rest) = "\tadd " ++ (printOperand e1) ++ ", " ++ (printOperand e2) ++ "\n" ++ (printInstrs rest)
 printInstrs ((Sub e1 e2):rest) = "\tsub " ++ (printOperand e1) ++ ", " ++ (printOperand e2) ++ "\n" ++ (printInstrs rest)
@@ -287,10 +290,7 @@ compile (Exp_If cond_exp true_exp false_exp) = do
 
 compile (Exp_While cond_exp body_exp) = do
   cond_instrs <- compile cond_exp
-  old_state <- (.rsp) <$> get
-  modify $ (\st -> st { rsp = 0 })
   body_instrs <- compile body_exp
-  modify $ (\st -> st { rsp = old_state })
   modify incCounter
   counter <- (.counter) <$> get
   let label1 = ("LOOP_START" ++ (show counter))
@@ -319,22 +319,26 @@ compile (Exp_Assignment left_exp right_exp) = do
     (Nothing) -> error "variable doesnt exist"
 
 compile (Exp_Declaration varname typename rhs_exp) = do
-  state <- get
-  let var = Map.lookup varname state.symtab
+  symtab <- (.symtab) <$> get
+  let var = Map.lookup varname symtab
   case var of
-    (Just pos) -> error "variable exists"
+    (Just pos) -> error $ "variable exists: " ++ varname
     (Nothing) -> do
+      state <- get
       let pos = state.rsp + 8
-      put $ state {symtab = Map.insert varname pos state.symtab, rsp = pos}
+      put $ state { symtab = Map.insert varname pos state.symtab, rsp = pos }
       rhs <- compile rhs_exp
       return $
         rhs <>
-        [ Push $ Register "rax" ]
+        [ Comment $ "declaration of " ++ varname ++ " at position [rbp-" ++ (show pos) ++ "]", Push $ Register "rax" ]
 
 compile (Exp_Proc name args body) = case name of
   Exp_String name_s -> do
+    old_state <- get
     push_args_instrs <- push_args args args_registers
     body_instrs <- compile body
+    new_state <- get
+    modify $ const $ new_state { rsp = old_state.rsp, symtab = old_state.symtab }
     return $ [ Label name_s, Push $ Register "rbp", Mov (Register "rbp") (Register "rsp") ] <> push_args_instrs <> body_instrs <> [ Add (Register "rsp") (Literal $ 8 * (length args)) ] <> [ Pop (Register "rbp"), Ret ]
       where
         args_registers = take (length args) $ Register <$> ["rdi", "rsi", "rcx", "rdx", "r8", "r9"]
@@ -369,20 +373,19 @@ compile (Exp_ProcCall name' args') = do
 
 compile (Exp_SourceBlock exprs) = do
   old_state <- get
-  instrs <- get_instrs exprs
+  instrs <- compile_exprs exprs
   new_state <- get
-  modify $ (\st -> st { rsp = old_state.rsp, symtab = old_state.symtab })
-  return $ instrs <> [ Add (Register "rsp") (Literal $ new_state.rsp - old_state.rsp) ]
+  modify $ \st -> st { rsp = old_state.rsp, symtab = old_state.symtab }
+  return $ instrs <> [ Add (Register "rsp") (Literal $ 0 - old_state.rsp + new_state.rsp) ]
     where
-      get_instrs :: [Expression] -> State CompilerState [Instruction]
-      get_instrs (exp:exprs) = do
+      compile_exprs :: [Expression] -> State CompilerState [Instruction]
+      compile_exprs (exp:exprs) = do
         a <- compile exp
-        b <- get_instrs exprs
+        b <- compile_exprs exprs
         return $ a <> b
-      get_instrs [] = do
-        return []
+      compile_exprs [] = return []
 
-compile (Exp_Empty) = return $ []
+compile (Exp_Empty) = return []
 
 compile e = error $ "unhandled expression: \n" ++ (print_exp 0 e)
 

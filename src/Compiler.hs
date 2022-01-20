@@ -307,7 +307,7 @@ compile (Exp_While cond_exp body_exp) = do
 compile (Exp_Assignment left_exp right_exp) = do
   let varname = case left_exp of
                   (Exp_String s) -> s
-                  _ -> error "only have variable names on lhs" -- TODO: allow array indexing, etc on lhs
+                  _ -> error $ "only have variable names on lhs\nactually had: " ++ (show left_exp) -- TODO: allow array indexing, etc on lhs
   state <- get
   let var = Map.lookup varname state.symtab
   case var of

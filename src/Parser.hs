@@ -11,18 +11,15 @@ import Data.Hashable
 import Text.Printf
 import qualified Data.HashMap as Map
 import Control.Applicative
-import Data.Either hiding (show)
 
 data Type = 
-  Type_Int
-  | Type_String
-  | Type_Bool
-  | Type_Pointer
-  | Type_Func
-
--- type ExprID = Int
--- data Expression = Expression ExprID [Expression] [TokenType]
---   deriving (Eq, Ord, Show)
+  Type_Int |
+  Type_String |
+  Type_Bool |
+  Type_Pointer |
+  Type_Func |
+  Type_Arr Type Int
+  deriving (Eq, Show)
 
 data Eq i => Error i
   = EndOfInput  -- Expected more input, but there is nothing
@@ -44,7 +41,6 @@ show_err EndOfInput _ = "end of input\n"
 show_err (Unexpected i j) orig = let (row, col) = get_srcpos j orig in "unexpected: " ++ (show i) ++ " at position " ++ (show row) ++ ":" ++ (show col) ++ "\n"
 show_err (Expected i j k) orig = let (row, col) = get_srcpos k orig in "expected: " ++ (show i) ++ ", but got " ++ (show j) ++ " at position " ++ (show row) ++ ":" ++ (show col) ++ "\n"
 show_err Empty _ = undefined
-
 
 instance (Show i, Eq i) => Show (Error i) where
   show EndOfInput = "end of input\n"
@@ -165,7 +161,7 @@ data Expression =
   Exp_Or Expression Expression |
   Exp_Dump Expression |
   Exp_Assignment Expression Expression |
-  Exp_Declaration String String Expression |
+  Exp_Declaration String Type Expression |
   Exp_ArrIndex Expression Expression |
   Exp_ArrCreate Expression |
   Exp_Value Expression |
@@ -213,19 +209,19 @@ print_exp spaces (Exp_Empty) = (sp spaces) ++ "EMPTY\n"
 print_exp spaces (Exp_SourceBlock es) = (sp spaces) ++ "SOURCE BLOCK\n" ++ foldr (\e str -> (print_exp (spaces+2) e) ++ str) "" es
 print_exp spaces e = error "unexhaustive print_exp: (" ++ (show e) ++ ")"
 
-integerP :: Parser Char Expression
-integerP = Exp_Int <$> read <$> spanP isDigit
+integerP :: Parser Char Int
+integerP = read <$> spanP isDigit
 
-floatP :: Parser Char Expression
+floatP :: Parser Char Float
 floatP = do
   a <- spanP isDigit
   charP '.'
   b <- spanP isDigit
-  let f = read (a ++ "." ++ b)
-  return $ Exp_Float $ f
+  let f = read $ a ++ "." ++ b
+  return $ f
 
 numP :: Parser Char Expression
-numP = (floatP) <|> (integerP)
+numP = (Exp_Float <$> floatP) <|> (Exp_Int <$> integerP)
 
 ws :: Parser Char String
 ws = Parser $ \input -> Right $ let (a, b) = span isSpace input.str in (a, input {str=b, pos=input.pos + (length a)})
@@ -349,22 +345,22 @@ statementP :: Parser Char Expression
 statementP = controlStructureP <|> ((declarationP <|> expressionP) <* (wcharP ';'))
 
 controlStructureP :: Parser Char Expression
-controlStructureP = ifP <|> whileP <|> procP
+controlStructureP = ifP <|> whileP
 
 declarationP :: Parser Char Expression
 declarationP = do
   wss $ stringP "let "
   varname <- wordP
-  -- wcharP ':'
-  -- typename <- wordP
-  wcharP '='
-  exp <- expressionP
-  return $ Exp_Declaration varname "" exp
-
-data Operator =
-  ArrIndex |
-  ProcCall
-
+  wcharP ':'
+  t <- typeP
+  rhs <- wcharP '=' *> expressionP
+  return $ Exp_Declaration varname t rhs
+    where
+      typeP :: Parser Char Type
+      typeP =
+        (const Type_Int <$> stringP "i64") <|> 
+        (Type_Arr <$> (wcharP '[' *> typeP) <*> (wcharP ';' *> integerP <* wcharP ']')) 
+ 
 data OperatorLevel =
   BinaryOperatorList [(String, Expression -> Expression -> Expression)] |
   PrefixUnaryOperatorList [(String, Expression -> Expression)] |

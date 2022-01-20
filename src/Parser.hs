@@ -197,6 +197,7 @@ print_exp spaces (Exp_LessThan e1 e2) = (sp spaces) ++ "LT\n" ++ (print_exp (spa
 print_exp spaces (Exp_GreaterEqual e1 e2) = (sp spaces) ++ "GE\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_LessEqual e1 e2) = (sp spaces) ++ "LE\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_GreaterThan e1 e2) = (sp spaces) ++ "GT\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+print_exp spaces (Exp_Equality e1 e2) = (sp spaces) ++ "EQUALITY\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_And e1 e2) = (sp spaces) ++ "AND\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_Or e1 e2) = (sp spaces) ++ "OR\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_Dump e1) = (sp spaces) ++ "DUMP\n" ++ (print_exp (spaces+2) e1)
@@ -210,7 +211,7 @@ print_exp spaces (Exp_Float i) = (sp spaces) ++ (show i) ++ "\n"
 print_exp spaces (Exp_String s) = (sp spaces) ++ (s) ++ "\n"
 print_exp spaces (Exp_Empty) = (sp spaces) ++ "EMPTY\n"
 print_exp spaces (Exp_SourceBlock es) = (sp spaces) ++ "SOURCE BLOCK\n" ++ foldr (\e str -> (print_exp (spaces+2) e) ++ str) "" es
-print_exp spaces e = error "unexhaustive print_exp: (" ++ (show e) ++ " )"
+print_exp spaces e = error "unexhaustive print_exp: (" ++ (show e) ++ ")"
 
 integerP :: Parser Char Expression
 integerP = Exp_Int <$> read <$> spanP isDigit

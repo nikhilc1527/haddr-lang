@@ -232,7 +232,29 @@ compile (Exp_GreaterThan e1 e2) = do
       Mov (Register "rax") (Literal 1),
       Label label2
     ]
-    ]  
+    ]
+compile (Exp_Equality e1 e2) = do
+  a <- compile e1
+  b <- compile e2
+  modify incCounter
+  counter <- (.counter) <$> get
+  let label1 = ("COMPARISON" ++ (show counter))
+  let label2 = ("COMPARISON_END" ++ (show counter))
+  return $ fold $ [
+    a,
+    [Push $ Register "rax"],
+    b,
+    [
+      Pop $ Register "rbx",
+      Cmp (Register "rax") (Register "rbx"),
+      Je $ label1,
+      Mov (Register "rax") (Literal 0),
+      Jmp label2,
+      Label label1, 
+      Mov (Register "rax") (Literal 1),
+      Label label2
+    ]
+    ]
 {-
 cond_instrs
 cmp rax, 0
@@ -246,7 +268,9 @@ end
 compile (Exp_If cond_exp true_exp false_exp) = do
   cond_instrs <- compile cond_exp
   true_instrs <- compile true_exp
-  false_instrs <- compile false_exp
+  false_instrs <- case false_exp of
+    Exp_Empty -> return []
+    _ -> compile false_exp
   modify incCounter
   state <- get
   let label1 = ("ELSE" ++ (show state.counter))
@@ -358,7 +382,7 @@ compile (Exp_SourceBlock exprs) = do
       get_instrs [] = do
         return []
 
-compile Exp_Empty = return $ []
+compile (Exp_Empty) = return $ []
 
 compile e = error $ "unhandled expression: \n" ++ (print_exp 0 e)
 

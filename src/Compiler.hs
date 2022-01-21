@@ -39,13 +39,19 @@ data Instruction =
   Ret
   deriving (Show)
 
+data Symbol =
+  Variable { stackPos :: Int, size :: Int } |
+  Function { name :: String } |
+  Array { stackPos :: Int, size :: Int, sub :: Symbol }
+  deriving (Eq)
+
 data CompilerState =
   CompilerState
   {
     counter :: Int,
-    symtab :: Map.Map String Int,
+    symtab :: Map.Map String Symbol,
     rsp :: Int
-  } deriving (Eq, Show)
+  } deriving (Eq)
 
 initialCompilerState :: CompilerState
 initialCompilerState = CompilerState 0 Map.empty 0
@@ -87,7 +93,7 @@ compile (Exp_String varname) = do
   case var of
     (Just pos) -> do
       return $
-        [Mov (Register "rax") (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]"))]
+        [Mov (Register "rax") (Addr $ ("QWORD [rbp-" ++ (show pos.stackPos) ++ "]"))]
     (Nothing) -> error $ "variable " ++ varname ++ " does not exist"
 compile (Exp_Plus e1 e2) = do
   a <- compile e1
@@ -315,7 +321,7 @@ compile (Exp_Assignment left_exp right_exp) = do
       rhs <- compile right_exp
       return $
         rhs <>
-        [Mov (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]")) (Register "rax")]
+        [Mov (Addr $ ("QWORD [rbp-" ++ (show pos.stackPos) ++ "]")) (Register "rax")]
     (Nothing) -> error "variable doesnt exist"
 
 compile (Exp_Declaration varname typename rhs_exp) = do
@@ -326,7 +332,7 @@ compile (Exp_Declaration varname typename rhs_exp) = do
     (Nothing) -> do
       state <- get
       let pos = state.rsp + 8
-      put $ state { symtab = Map.insert varname pos state.symtab, rsp = pos }
+      put $ state { symtab = Map.insert varname (Variable pos 8) state.symtab, rsp = pos }
       rhs <- compile rhs_exp
       return $
         rhs <>
@@ -346,7 +352,7 @@ compile (Exp_Proc name args body) = case name of
         push_args [] [] = return [] 
         push_args (arg:args) (reg:regs) = case arg of
           (Exp_String arg_name) -> do
-            modify $ \st -> st { rsp = st.rsp + 8, symtab = Map.insert arg_name (st.rsp + 8) st.symtab }
+            modify $ \st -> st { rsp = st.rsp + 8, symtab = Map.insert arg_name (Variable (st.rsp + 8) 8) st.symtab }
             rest <- push_args args regs
             return $ [ Push reg ] <> rest
           _ -> error "name of procedure argument has to be a string"

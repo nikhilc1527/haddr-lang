@@ -413,4 +413,3 @@ runParser :: Parser Char Expression -> String -> IO ()
 runParser parser input = putStrLn $ case parser.run $ Input input 0 of
                            Right (exp, rest) -> ((print_exp 0 exp) ++ "\nrest:\n" ++ (show rest))
                            Left err -> show err
-

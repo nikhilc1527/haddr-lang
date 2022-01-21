@@ -1,8 +1,10 @@
-proc fib(a) {
-  if (a < 2) a;
-  else fib(a-2) + fib(a-1);
-}
-
 proc main() {
-  printi(fib(30));
+  let i: i64 = 0;
+  let j: i64 = 1;
+  while (i < 1000) {
+    printi(i);
+    let k: i64 = i + j;
+    i = j;
+    j = k;
+  }
 }

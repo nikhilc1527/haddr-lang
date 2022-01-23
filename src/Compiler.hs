@@ -40,9 +40,9 @@ data Instruction =
   deriving (Show)
 
 data Symbol =
-  Variable { stackPos :: Int, size :: Int } |
-  Function { name :: String } |
-  Array { stackPos :: Int, size :: Int, sub :: Symbol }
+  Variable { stackPos :: Int, typename :: Type } |
+  Function { name :: String, sig :: Type } |
+  Array { stackPos :: Int, sub :: Symbol }
   deriving (Eq)
 
 data CompilerState =
@@ -332,9 +332,9 @@ compile (Exp_Declaration varname typename rhs_exp) = do
     (Nothing) -> do
       state <- get
       let pos = state.rsp + 8
-      put $ state { symtab = Map.insert varname (Variable pos 8) state.symtab, rsp = pos }
+      put $ state { symtab = Map.insert varname (Variable pos typename) state.symtab, rsp = pos }
       rhs <- compile rhs_exp
-      return $
+      return $ -- (Trace.trace $ "declaring " ++ varname ++ " of type " ++ (show typename)) $ 
         rhs <>
         [ Comment $ "declaration of " ++ varname ++ " at position [rbp-" ++ (show pos) ++ "]", Push $ Register "rax" ]
 
@@ -352,7 +352,7 @@ compile (Exp_Proc name args body) = case name of
         push_args [] [] = return [] 
         push_args (arg:args) (reg:regs) = case arg of
           (Exp_String arg_name) -> do
-            modify $ \st -> st { rsp = st.rsp + 8, symtab = Map.insert arg_name (Variable (st.rsp + 8) 8) st.symtab }
+            modify $ \st -> st { rsp = st.rsp + 8, symtab = Map.insert arg_name (Variable (st.rsp + 8) Type_Int) st.symtab }
             rest <- push_args args regs
             return $ [ Push reg ] <> rest
           _ -> error "name of procedure argument has to be a string"

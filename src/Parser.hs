@@ -16,9 +16,9 @@ data Type =
   Type_Int |
   Type_String |
   Type_Bool |
-  Type_Pointer |
-  Type_Func |
-  Type_Arr Type Int
+  Type_Pointer Type |
+  Type_Arr Type Int |
+  Type_Func
   deriving (Eq, Show)
 
 data Eq i => Error i

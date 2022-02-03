@@ -18,7 +18,8 @@ data Type =
   Type_Bool |
   Type_Pointer Type |
   Type_Arr Type Int |
-  Type_Func
+  Type_Func |
+  Type_Empty
   deriving (Eq, Show)
 
 data Eq i => Error i
@@ -94,6 +95,7 @@ instance (Eq i) => Alternative (Parser i) where
 instance Monad (Parser i) where
   return = pure
 
+  -- k :: a -> Parser b
   Parser p >>= k = Parser $ \input -> do
     (output, rest) <- p input
     (k output).run rest
@@ -159,9 +161,9 @@ data Expression =
   Exp_GreaterThan Expression Expression |
   Exp_And Expression Expression |
   Exp_Or Expression Expression |
-  Exp_Dump Expression |
   Exp_Assignment Expression Expression |
   Exp_Declaration String Type Expression |
+  Exp_LValue Expression |
   Exp_ArrIndex Expression Expression |
   Exp_ArrCreate Expression |
   Exp_Value Expression |
@@ -196,7 +198,7 @@ print_exp spaces (Exp_GreaterThan e1 e2) = (sp spaces) ++ "GT\n" ++ (print_exp (
 print_exp spaces (Exp_Equality e1 e2) = (sp spaces) ++ "EQUALITY\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_And e1 e2) = (sp spaces) ++ "AND\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_Or e1 e2) = (sp spaces) ++ "OR\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-print_exp spaces (Exp_Dump e1) = (sp spaces) ++ "DUMP\n" ++ (print_exp (spaces+2) e1)
+print_exp spaces (Exp_LValue e) = (sp spaces) ++ "LVALUE\n" ++ (print_exp (spaces+2) e)
 print_exp spaces (Exp_Assignment e1 e2) = (sp spaces) ++ "ASSIGNMENT\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_Declaration varname typename e) = (sp spaces) ++ "DECLARATION\n" ++ (sp $ spaces+2) ++ varname ++ "\n" ++ (print_exp (spaces+2) e)
 print_exp spaces (Exp_ArrIndex e1 e2) = (sp spaces) ++ "ARR_INDEX\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)

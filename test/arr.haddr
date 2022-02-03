@@ -1,16 +1,17 @@
 proc main() {
-  let fiblen: i64 = 200000;
-  let fibs:[i64; 200000] = 0;
-  fibs[0] = 0;
-  fibs[1] = 1;
-  let n: i64 = 2;
-  while (n < fiblen) {
-    fibs[n] = fibs[n-1] + fibs[n-2];
-    n = n + 1;
+  let arr:[i64; 10] = 0;
+  let i:i64 = 0;
+  while (i < 10) {
+    arr[i] = i;
+    i = i + 1;
   }
-  n = 0;
-  while (n < fiblen) {
-    printi(fibs[n]);
-    n = n + 1;
+  let sum: i64 = 0;
+  i = 0;
+  while (i < 10) {
+    sum = sum + arr[i];
+    i = i + 1;
   }
+
+  printi(arr[0] + arr[1]);
+  printi(sum);
 }

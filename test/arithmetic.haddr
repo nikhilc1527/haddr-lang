@@ -1,9 +1,9 @@
 proc main() {
-  let a = 1;
-  let b = 2;
-  let c = 3;
-  let d = 1;
-  
-  let sum = a + b * c + d;
+  let a: i64 = 1;
+  let b: i64 = 2;
+  let c: i64 = 3;
+  let d: i64 = 4;
+ 
+  let sum: i64 = a + b * c - d;
   printi(sum);
 }

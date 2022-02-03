@@ -1,0 +1,16 @@
+proc main() {
+  let fiblen: i64 = 200000;
+  let fibs:[i64; 200000] = 0;
+  fibs[0] = 0;
+  fibs[1] = 1;
+  let n: i64 = 2;
+  while (n < fiblen) {
+    fibs[n] = fibs[n-1] + fibs[n-2];
+    n = n + 1;
+  }
+  n = 0;
+  while (n < fiblen) {
+    printi(fibs[n]);
+    n = n + 1;
+  }
+}

@@ -1,28 +1,13 @@
-proc testthree() {
-  printi(3+4);
-}
-
-proc testtwo() {
-  printi(2+3);
-  testthree();
-}
-
-proc test() {
-  printi(1+2);
-  testtwo();
-}
-
 proc main() {
-  let sum = 0;
-  let i = 0;
-  while (i - 20) {
-    let j = 0;
-    while (j - 20) {
+  let sum: i64 = 0;
+  let i: i64 = 0;
+  while (i < 20) {
+    let j: i64 = 0;
+    while (j < 20) {
       sum = sum + 1;
       j = j + 1;
-      test();
     }
-    while (j - 40) {
+    while (j < 40) {
       sum = sum + 2;
       j = j + 1;
     }

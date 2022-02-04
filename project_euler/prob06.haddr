@@ -1,18 +1,19 @@
-max = 100;
+proc main() {
+  let max: i64 = 100;
+  let sum_of_squares: i64 = 0;
 
-sum_of_squares = 0;
+  let i: i64 = 1;
+  while (i <= max) {
+    sum_of_squares = sum_of_squares + i * i;
+    i = i + 1;
+  }
 
-i = 1;
-while i < max + 1 do
-      sum_of_squares = sum_of_squares + i * i;
-      i = i + 1;
-end;
-
-square_of_sum = 0;
-i = 1;
-while i < max + 1 do
-      square_of_sum = square_of_sum + i;
-      i = i + 1;
-end;
-square_of_sum = square_of_sum * square_of_sum;
-puti(square_of_sum - sum_of_squares); . 10;
+  i = 1;
+  let square_of_sum: i64 = 0;
+  while (i <= max) {
+    square_of_sum = square_of_sum + i;
+    i = i + 1;
+  }
+  square_of_sum = square_of_sum * square_of_sum;
+  printi(square_of_sum - sum_of_squares);
+}

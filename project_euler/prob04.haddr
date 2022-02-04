@@ -1,24 +1,23 @@
-largest = 0;
-i = 100;
-while i < 1000 do
-  j = 100;
-  while j < 1000
-  do
-    product = i * j;
-    reverse = 0;
-    while product do
-      reverse = reverse * 10;
-      reverse = reverse + product % 10;
-      product = product / 10;
-    end;
-    product = i * j;
-    if (product - reverse) do 0 else
-      if (product > largest) do
-        largest = product;
-      else end;
-    end;
-    j = j + 1;
-  end;
-  i = i + 1;
-end;
-puti(largest); . 10;
+proc main() {
+  let largest: i64 = 0;
+  let i: i64 = 100;
+  while (i < 1000) {
+    let j: i64 = 100;
+    while (j < 1000) {
+      let product: i64 = i * j;
+      let reverse: i64 = 0;
+      while (product > 0) {
+        reverse = reverse * 10 + product % 10;
+	product = product / 10;
+      }
+      product = i * j;
+      if (product == reverse) {
+        if (product > largest) 
+	  largest = product;
+      }
+      j = j + 1;
+    }
+    i = i + 1;
+  }
+  printi(largest);
+}

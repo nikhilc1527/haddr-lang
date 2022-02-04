@@ -1,17 +1,18 @@
-i = 1;
-lcm = 1;
-max = 20;
-while i < max + 1 do
-  a = lcm;
-  b = i;
-  R = a % b;
-  while (a % b > 0) do
-    R = a % b;
-    a = b;
-    b = R;
-  end;
-  lcm = i * lcm / b;
-  puti(i); . 10;
-  puti(lcm); . 10;
-  i = i + 1;
-end;
+proc main() {
+  let i: i64 = 1;
+  let lcm: i64 = 1;
+  let max: i64 = 20;
+  while (i < max + 1) {
+    let a: i64 = lcm;
+    let b: i64 = i;
+    let R: i64 = a % b;
+    while (a % b > 0) {
+      R = a % b;
+      a = b;
+      b = R;
+    }
+    lcm = i * lcm / b;
+    i = i + 1;
+  }
+  printi(lcm);
+}

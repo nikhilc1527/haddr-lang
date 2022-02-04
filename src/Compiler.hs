@@ -156,10 +156,11 @@ compile_lvalue (Exp_ArrIndex lvalue index) = do
   put_instr $ Push $ Register "rax"
   index_val <- compile index
   put_instrs $
-    [ Mov (Register "rbx") (Register "rax"),
+    [ Mov (Register "rbx") (Literal $ sizeof subtype `div` 8),
+      Mul (Register "rbx"),
+      Mov (Register "rbx") (Register "rax"),
       Pop $ Register "rax",
-      Comment $ "lvalue of array of " ++ (show subtype) ++ ":" ++ (show $ sizeof subtype),
-      Lea (Register "rax") (Addr $ ("rax [" ++ (show $ (sizeof subtype)) ++ "*rbx]"))
+      Lea (Register "rax") (Addr $ ("rax [8*rbx]"))
     ]
   return $ subtype
 compile_lvalue e = error $ "expression \n" ++ (print_exp 0 e) ++ "is not allowed in lhs right now"
@@ -245,15 +246,12 @@ compile (Exp_Mod e1 e2) = do
   return Type_Empty
 
 compile (Exp_Assignment left_exp right_exp) = do
-  put_instr EmptyLine
-  put_instr $ Comment $ "beginning assignment"
   lhs <- compile_lvalue left_exp
   put_instr $ Push $ Register "rax"
   rhs <- compile right_exp
   put_instrs $
     [Mov (Register "rbx") (Register "rax")] <>
     [Pop $ Register "rax"] <>
-    [Comment $ "assigning " ++ (show left_exp) ++ " to " ++ (show right_exp)] <>
     [Mov (Addr $ "QWORD [rax]") (Register "rbx")]
   put_instr EmptyLine
   return Type_Empty
@@ -415,13 +413,13 @@ compile (Exp_Declaration varname typename rhs_exp) = do
           let pos = state.rsp + 8
           put_state $ state { symtab = Map.insert varname (Sym_Variable pos typename) state.symtab, rsp = pos }
           compile rhs_exp
-          put_instrs $ [ Comment $ "declaration of " ++ varname ++ " at position [rbp-" ++ (show pos) ++ "]", Push $ Register "rax" ]
+          put_instrs $ [ Push $ Register "rax" ]
         (Type_Arr subtype length) -> do
           state <- get_state
           let subsize = sizeof subtype
           let arr_size = subsize * length
           put_state $ state { rsp = state.rsp + arr_size, symtab = Map.insert varname (Sym_Variable (state.rsp + arr_size) typename) state.symtab }
-          put_instrs $ [ Comment $ "declaration of array: length " ++ (show length) ++ " and subtype " ++ (show subtype), Sub (Register "rsp") (Literal $ length * subsize) ]
+          put_instrs $ [ Sub (Register "rsp") (Literal $ length * subsize) ]
       return Type_Empty
 
 compile (Exp_Proc (Exp_String name) args body) = do

@@ -1,28 +1,20 @@
-target = 600851475143;
-largest = 1;
-i = 1;
-while i < 775147
-do
-  if target % i
-  do 0
-  else
-    isprime = 1;
-    j = 2;
-    while j < 881 && isprime
-    do
-      if i % j
-      do 0
-      else
-        isprime = 0;
-      end;
-      j = j + 1;
-    end;
-    if isprime
-    do
-      largest = i;
-    else 0
-    end;
-  end;
-  i = i + 1;
-end;
-puti(largest); . 10;
+proc main() {
+  let target: i64 = 600851475143;
+  let largest: i64 = 1;
+  let i: i64 = 1;
+  while (i < 775147) {
+    if (target % i == 0) {
+      let isprime: i64 = 1;
+      let j: i64 = 2;
+      while (j < 881 && isprime > 0) {
+        if (i % j == 0) isprime = 0;
+	j = j + 1;
+      }
+      if (isprime > 0) {
+        largest = i;
+      }
+    }
+    i = i + 1;
+  }
+  printi(largest);
+}

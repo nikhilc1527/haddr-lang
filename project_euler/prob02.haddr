@@ -1,17 +1,17 @@
-a = 1;
-b = 2;
-c = 3;
-sum = 0;
-while a < 400000
-do
-  a = b;
-  b = c;
-  c = a + b;
-  if a % 2
-  do
-    0
-  else
-    sum = sum + a;
-  end;
-end;
-puti(sum); . 10;
+proc main() {
+  let a: i64 = 1;
+  let b: i64 = 2;
+  let c: i64 = 3;
+  let sum: i64 = 0;
+
+  while (a < 4000000) {
+    a = b;
+    b = c;
+    c = a + b;
+    if (a % 2 == 0) { 
+      sum = sum + a;
+    }
+  }
+
+  printi(sum);
+}

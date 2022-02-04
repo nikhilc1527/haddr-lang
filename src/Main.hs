@@ -57,22 +57,25 @@ parseFile filepath = do
 
 runFile :: FilePath -> IO ()
 runFile filepath = do
-  compileFile filepath
-  let process = (shell "./main") {cwd = Just "compilation_out/"}
-  (_, stdout_handle, _, proc_handle) <- createProcess process
-  -- threadDelay 10000
-  forkIO $ do
-    threadDelay 1000000
-    terminateProcess proc_handle
-  waitForProcess proc_handle
-  nullfile <- openFile "/dev/null" ReadMode
-  output <- hGetContents $ maybe nullfile id stdout_handle
-  putStr output
-  -- removeFile "compilation_out/main"
-  -- removeFile "compilation_out/main.asm"
-  -- removeFile "compilation_out/main.o"
+  ecode <- compileFile filepath
+  case ecode of
+    ExitSuccess -> do
+      let process = (shell "./main") {cwd = Just "compilation_out/"}
+      (_, stdout_handle, _, proc_handle) <- createProcess process
+      -- threadDelay 10000
+      forkIO $ do
+        threadDelay 1000000
+        terminateProcess proc_handle
+      waitForProcess proc_handle
+      nullfile <- openFile "/dev/null" ReadMode
+      output <- hGetContents $ maybe nullfile id stdout_handle
+      putStr output
+      -- removeFile "compilation_out/main"
+      -- removeFile "compilation_out/main.asm"
+      -- removeFile "compilation_out/main.o"
+    ExitFailure n -> return ()
 
-compileFile :: FilePath -> IO ()
+compileFile :: FilePath -> IO ExitCode
 compileFile filepath = do
   str <- readFile filepath
   let is = src_to_asm str
@@ -83,7 +86,6 @@ compileFile filepath = do
   let process = (shell "make -B -s") {cwd = Just "compilation_out/"}
   (_, stdout_handle, _, proc_handle) <- createProcess process
   waitForProcess proc_handle
-  return ()
   -- removeFile "compilation_out/main"
   -- removeFile "compilation_out/main.asm"
   -- removeFile "compilation_out/main.o"
@@ -93,5 +95,6 @@ main = do
   args <- getArgs
   let file = head args
   compileFile file
+  return ()
   -- return ()
   -- processArgs args

@@ -1,13 +1,12 @@
-sum = 0;
-i = 0;
-while i < 1000
-do
-   if (i % 3) * (i % 5)
-   do
-      0
-   else
-      sum = sum + i
-   end;
-   i = i + 1;
-end;
-puti(sum); . 10;
+proc main() {
+  let sum: i64 = 0;
+  let i: i64 = 0;
+  while (i < 1000) {
+    if (i % 3 == 0 || i % 5 == 0) {
+      sum = sum + i;
+    }
+    i = i + 1;
+  }
+
+  printi(sum);
+}

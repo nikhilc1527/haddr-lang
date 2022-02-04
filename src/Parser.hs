@@ -235,7 +235,7 @@ tryParse def parser = Parser $ \input ->
                                    Right a -> Right a
 
 wordP :: Parser Char String
-wordP = spanP isAlpha
+wordP = spanP (\c -> isAlpha c || c == '_')
 
 -- white space surround
 wss :: Parser Char a -> Parser Char a
@@ -253,20 +253,26 @@ notReallyP i = Parser $ \input ->
 
 operatorLevelP :: (Parser Char Expression) -> OperatorLevel -> (Parser Char Expression)
 -- array subscript and procedure call
-operatorLevelP next_op (FixedLevel 1) = arrIndexP <|> procCallP <|> next_op
+operatorLevelP next_op (FixedLevel 1) = do
+  next <- next_op
+  arr_or_calls <- get_arr_or_calls <|> nop []
+  return $ foldl (\lv op -> op lv) next arr_or_calls
+-- operatorLevelP next_op (FixedLevel 1) = arrIndexP <|> procCallP <|> next_op
   where
+    get_arr_or_calls = do
+      cur <- arrIndexP <|> procCallP
+      nexts <- get_arr_or_calls <|> nop []
+      return $ cur:nexts
     arrIndexP = do
-      name <- next_op
       wcharP '['
       value <- expressionP
       wcharP ']'
-      return $ Exp_ArrIndex name value
+      return $ (flip Exp_ArrIndex) value
     procCallP = do
-      name <- next_op
       wcharP '('
       params <- (commas_to_list <$> expressionP) <|> nop []
       wcharP ')'
-      return $ Exp_ProcCall name params
+      return $ (flip Exp_ProcCall) params
         where
           commas_to_list :: Expression -> [Expression]
           commas_to_list (Exp_Comma e1 e2) = ((commas_to_list e1) ++ [e2])
@@ -275,15 +281,13 @@ operatorLevelP next_op (FixedLevel 1) = arrIndexP <|> procCallP <|> next_op
 operatorLevelP next_op bs@(BinaryOperatorList ops) = do
   initial <- next_op
   nexts <- next_parser <|> nop []
-          -- (const [] <$> ((notReallyP ')') <|> (notReallyP ';') <|> (notReallyP ']')))
   return $ foldl (\ expr (operator, next_operand) -> operator expr next_operand) initial nexts
     where
       operator_func = fold $ map (\(op_str, operator_func) -> const operator_func <$> (wss $ stringP op_str)) ops
       next_parser = do
         operator <- operator_func
         operand <- next_op
-        nexts <-  next_parser <|> nop []
-          -- (const [] <$> ((notReallyP ')') <|> (notReallyP ';') <|> (notReallyP ']')))
+        nexts <- next_parser <|> nop []
         return ((operator, operand):nexts)
 operatorLevelP _ _ = error "unreachable"
 
@@ -327,19 +331,35 @@ procP :: Parser Char Expression
 procP = do
   ws *> stringP "proc "
   func_name <- wss $ (Exp_String <$> wordP)
-  args <- (commas_to_list <$> expressionP) <|> (const [] <$> (wcharP '(' >> wcharP ')'))
+  -- args <- (commas_to_list <$> expressionP) <|> (const [] <$> (wcharP '(' >> wcharP ')'))
+  args <- do
+    wcharP '('
+    args <- argsP <|> nop []
+    wcharP ')'
+    return args
   body <- parseBlock <|> statementP
   return $ Exp_Proc func_name args body
     where
+      argsP = do
+        name <- wordP
+        wcharP ':'
+        typename <- typeP
+        nexts <- (wcharP ',' *> argsP) <|> nop []
+        return $ (Exp_Declaration name typename Exp_Empty):nexts
       commas_to_list :: Expression -> [Expression]
       commas_to_list (Exp_Comma e1 e2) = ((commas_to_list e1) ++ [e2])
       commas_to_list e = [e]
+
+-- commentP :: Parser Char ()
+-- commentP = do
+  
 
 parseBlock :: Parser Char Expression
 parseBlock = Exp_SourceBlock <$> (wcharP '{' *> block)
     where
       block = do
-        cur <- statementP
+        cur <- -- commentP <|> 
+          statementP
         rest <- block <|> (const [] <$> (wcharP '}'))
         return $ (cur:rest)
 
@@ -349,6 +369,11 @@ statementP = controlStructureP <|> ((declarationP <|> expressionP) <* (wcharP ';
 controlStructureP :: Parser Char Expression
 controlStructureP = ifP <|> whileP
 
+typeP :: Parser Char Type
+typeP =
+  (const Type_Int <$> stringP "i64") <|> 
+  (Type_Arr <$> (wcharP '[' *> typeP) <*> (wcharP ';' *> integerP <* wcharP ']')) 
+
 declarationP :: Parser Char Expression
 declarationP = do
   wss $ stringP "let "
@@ -357,11 +382,6 @@ declarationP = do
   t <- typeP
   rhs <- wcharP '=' *> expressionP
   return $ Exp_Declaration varname t rhs
-    where
-      typeP :: Parser Char Type
-      typeP =
-        (const Type_Int <$> stringP "i64") <|> 
-        (Type_Arr <$> (wcharP '[' *> typeP) <*> (wcharP ';' *> integerP <* wcharP ']')) 
  
 data OperatorLevel =
   BinaryOperatorList [(String, Expression -> Expression -> Expression)] |

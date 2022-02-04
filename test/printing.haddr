@@ -1,0 +1,9 @@
+proc main() {
+  putch(104);
+  putch(101);
+  putch(108);
+  putch(108);
+  putch(111);
+  putch(10);
+  printi(123);
+}

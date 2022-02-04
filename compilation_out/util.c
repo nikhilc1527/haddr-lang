@@ -1,5 +1,7 @@
 #define ll int
 
+#define _XOPEN_SOURCE 500
+
 #include <unistd.h>
 #include <stdio.h>
 
@@ -30,4 +32,18 @@
 void printi(int num) {
   printf("%d\n", num);
   fflush(stdout);
+}
+
+void putch(int c) {
+  printf("%c", c);
+  fflush(stdout);
+}
+
+void puti(int i) {
+  printf("%d", i);
+  fflush(stdout);
+}
+
+void sleep_for(useconds_t usec) {
+  usleep(usec);
 }

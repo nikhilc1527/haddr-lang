@@ -42,7 +42,7 @@ src_to_asm :: String -> String
 src_to_asm input = initial_part ++ is ++ final_part
   where
     is = instrs input
-    initial_part = "global _start\nextern printi\n\nsection .text\n\n"
+    initial_part = "global _start\nextern printi\nextern putch\nextern puti\nextern sleep_for\n\nsection .text\n\n"
     final_part = "_start:\n\tpush rbp\n\tmov rbp, rsp\n\n\tcall main\n\n\tpop rbp\n\n\tmov rax, 60\n\tmov rdi, 0\n\tsyscall\n"  
 
 dumpASMOfFile :: FilePath -> IO()
@@ -57,13 +57,8 @@ parseFile filepath = do
 
 runFile :: FilePath -> IO ()
 runFile filepath = do
-  str <- readFile filepath
-  let is = src_to_asm str
-  handle <- openFile "compilation_out/main.asm" WriteMode
-  hPutStr handle is
-  hFlush handle
-  hClose handle
-  let process = (shell "make -B -s && ./main") {cwd = Just "compilation_out/"}
+  compileFile filepath
+  let process = (shell "./main") {cwd = Just "compilation_out/"}
   (_, stdout_handle, _, proc_handle) <- createProcess process
   -- threadDelay 10000
   forkIO $ do
@@ -76,11 +71,27 @@ runFile filepath = do
   -- removeFile "compilation_out/main"
   -- removeFile "compilation_out/main.asm"
   -- removeFile "compilation_out/main.o"
+
+compileFile :: FilePath -> IO ()
+compileFile filepath = do
+  str <- readFile filepath
+  let is = src_to_asm str
+  handle <- openFile "compilation_out/main.asm" WriteMode
+  hPutStr handle is
+  hFlush handle
+  hClose handle
+  let process = (shell "make -B -s") {cwd = Just "compilation_out/"}
+  (_, stdout_handle, _, proc_handle) <- createProcess process
+  waitForProcess proc_handle
+  return ()
+  -- removeFile "compilation_out/main"
+  -- removeFile "compilation_out/main.asm"
+  -- removeFile "compilation_out/main.o"
   
 main :: IO()
 main = do
   args <- getArgs
   let file = head args
-  runFile file
+  compileFile file
   -- return ()
   -- processArgs args

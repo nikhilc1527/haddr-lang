@@ -437,11 +437,18 @@ compile (Exp_Proc (Exp_String name) args body) = do
       args_registers = take (length args) $ Register <$> ["rdi", "rsi", "rcx", "rdx", "r8", "r9"]
       push_args :: [Expression] -> [Operand] -> Compiler Type
       push_args [] [] = return Type_Empty
-      push_args ((Exp_String arg_name):args) (reg:regs) = do
-        modify_state $ \st -> st { rsp = st.rsp + 8, symtab = Map.insert arg_name (Sym_Variable (st.rsp + 8) Type_Int) st.symtab }
+      push_args ((Exp_Declaration arg_name typename _):args) (reg:regs) = do
+        let size = sizeof typename
+        modify_state $ \st -> st { rsp = st.rsp + size, symtab = Map.insert arg_name (Sym_Variable (st.rsp + size) typename) st.symtab }
         put_instr $ Push reg
         rest <- push_args args regs
         return Type_Empty
+
+      -- push_args ((Exp_String arg_name):args) (reg:regs) = do
+      --   modify_state $ \st -> st { rsp = st.rsp + 8, symtab = Map.insert arg_name (Sym_Variable (st.rsp + 8) Type_Int) st.symtab }
+      --   put_instr $ Push reg
+      --   rest <- push_args args regs
+      --   return Type_Empty
 
 compile (Exp_ProcCall name' args') = do
   let name = (\e -> case e of

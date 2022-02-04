@@ -42,7 +42,7 @@ src_to_asm :: String -> String
 src_to_asm input = initial_part ++ is ++ final_part
   where
     is = instrs input
-    initial_part = "global _start\nextern printi\nextern putch\nextern puti\nextern sleep_for\n\nsection .text\n\n"
+    initial_part = "global _start\nextern printi\nextern putch\nextern puti\nextern unbuffer_term\nextern getch\nextern nonblock\nextern sleep_for\n\nsection .text\n\n"
     final_part = "_start:\n\tpush rbp\n\tmov rbp, rsp\n\n\tcall main\n\n\tpop rbp\n\n\tmov rax, 60\n\tmov rdi, 0\n\tsyscall\n"  
 
 dumpASMOfFile :: FilePath -> IO()

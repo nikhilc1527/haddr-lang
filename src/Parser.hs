@@ -169,13 +169,12 @@ data Expression =
   Exp_Or Expression Expression |
   Exp_Assignment Expression Expression |
   Exp_Declaration String Type Expression |
-  Exp_LValue Expression |
   Exp_ArrIndex Expression Expression |
-  Exp_ArrCreate Expression |
-  Exp_Value Expression |
+  Exp_Return Expression |
   Exp_Int Int |
   Exp_Float Float |
   Exp_String String |
+  Exp_StringLiteral String |
   Exp_SourceBlock [Expression] |
   Exp_Empty |
   Exp_INVALID
@@ -204,18 +203,17 @@ print_exp spaces (Exp_GreaterThan e1 e2) = (sp spaces) ++ "GT\n" ++ (print_exp (
 print_exp spaces (Exp_Equality e1 e2) = (sp spaces) ++ "EQUALITY\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_And e1 e2) = (sp spaces) ++ "AND\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_Or e1 e2) = (sp spaces) ++ "OR\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-print_exp spaces (Exp_LValue e) = (sp spaces) ++ "LVALUE\n" ++ (print_exp (spaces+2) e)
 print_exp spaces (Exp_Assignment e1 e2) = (sp spaces) ++ "ASSIGNMENT\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_Declaration varname typename e) = (sp spaces) ++ "DECLARATION\n" ++ (sp $ spaces+2) ++ varname ++ "\n" ++ (print_exp (spaces+2) e)
 print_exp spaces (Exp_ArrIndex e1 e2) = (sp spaces) ++ "ARR_INDEX\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
-print_exp spaces (Exp_ArrCreate e1) = (sp spaces) ++ "ARR_CREATE\n" ++ (print_exp (spaces+2) e1)
-print_exp spaces (Exp_Value e1) = (sp spaces) ++ "VALUE\n" ++ (print_exp (spaces+2) e1)
+print_exp spaces (Exp_Return e) = (sp spaces) ++ "RETURN" ++ "\n" ++ (print_exp (spaces+2) e)
 print_exp spaces (Exp_Int i) = (sp spaces) ++ (show i) ++ "\n"
 print_exp spaces (Exp_Float i) = (sp spaces) ++ (show i) ++ "\n"
-print_exp spaces (Exp_String s) = (sp spaces) ++ (s) ++ "\n"
+print_exp spaces (Exp_String s) = (sp spaces) ++ s ++ "\n"
+print_exp spaces (Exp_StringLiteral s) = (sp spaces) ++ "\"" ++ s ++ "\"\n"
 print_exp spaces (Exp_Empty) = (sp spaces) ++ "EMPTY\n"
 print_exp spaces (Exp_SourceBlock es) = (sp spaces) ++ "SOURCE BLOCK\n" ++ foldr (\e str -> (print_exp (spaces+2) e) ++ str) "" es
-print_exp spaces e = error "unexhaustive print_exp: (" ++ (show e) ++ ")"
+print_exp spaces e = error $ "unexhaustive print_exp: (" ++ (show e) ++ ")"
 
 integerP :: Parser Char Int
 integerP = read <$> spanP isDigit
@@ -230,6 +228,9 @@ floatP = do
 
 numP :: Parser Char Expression
 numP = (Exp_Float <$> floatP) <|> (Exp_Int <$> integerP)
+
+stringLiteralP :: Parser Char Expression
+stringLiteralP = error "string literal parser is not implemented"
 
 ws :: Parser Char String
 ws = Parser $ \input -> Right $ let (a, b) = span isSpace input.str in (a, input {str=b, pos=input.pos + (length a)})
@@ -364,13 +365,18 @@ parseBlock :: Parser Char Expression
 parseBlock = Exp_SourceBlock <$> (wcharP '{' *> block)
     where
       block = do
-        cur <- -- commentP <|> 
-          statementP
+        cur <- statementP
         rest <- block <|> (const [] <$> (wcharP '}'))
         return $ (cur:rest)
 
 statementP :: Parser Char Expression
-statementP = controlStructureP <|> ((declarationP <|> expressionP) <* (wcharP ';'))
+statementP = controlStructureP <|> ((declarationP <|> returnExpP <|> expressionP) <* (wcharP ';'))
+
+returnExpP :: Parser Char Expression
+returnExpP = do
+  stringP "return "
+  exp <- expressionP
+  return $ Exp_Return $ exp
 
 controlStructureP :: Parser Char Expression
 controlStructureP = ifP <|> whileP
@@ -419,7 +425,7 @@ expressionP = head operators
       operators = foldr (\ ops_list new_ops -> let op = operatorLevelP (head new_ops) ops_list in (op:new_ops)) [parseFinal] operators_raw
 
 parseFinal :: Parser Char Expression
-parseFinal = numP <|> (Exp_String <$> wordP) <|> parensP
+parseFinal = numP <|> (Exp_String <$> wordP) <|> parensP -- <|> stringLiteralP
   where
     parensP = do
       wcharP '('

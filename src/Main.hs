@@ -56,6 +56,22 @@ parseFile filepath = do
   str <- readFile filepath
   putStr $ parse str
 
+runFileForever :: FilePath -> IO ()
+runFileForever filepath = do
+  ecode <- compileFile filepath
+  case ecode of
+    ExitSuccess -> do
+      let process = (shell "./main") {cwd = Just "compilation_out/"}
+      (_, stdout_handle, _, proc_handle) <- createProcess process
+      waitForProcess proc_handle
+      nullfile <- openFile "/dev/null" ReadMode
+      output <- hGetContents $ maybe nullfile id stdout_handle
+      putStr output
+      removeFile "compilation_out/main"
+      removeFile "compilation_out/main.asm"
+      removeFile "compilation_out/main.o"
+    ExitFailure n -> return ()
+
 runFile :: FilePath -> IO ()
 runFile filepath = do
   ecode <- compileFile filepath
@@ -71,9 +87,9 @@ runFile filepath = do
       nullfile <- openFile "/dev/null" ReadMode
       output <- hGetContents $ maybe nullfile id stdout_handle
       putStr output
-      -- removeFile "compilation_out/main"
-      -- removeFile "compilation_out/main.asm"
-      -- removeFile "compilation_out/main.o"
+      removeFile "compilation_out/main"
+      removeFile "compilation_out/main.asm"
+      removeFile "compilation_out/main.o"
     ExitFailure n -> return ()
 
 compileFile :: FilePath -> IO ExitCode
@@ -87,10 +103,7 @@ compileFile filepath = do
   let process = (shell "make -B -s") {cwd = Just "compilation_out/"}
   (_, stdout_handle, _, proc_handle) <- createProcess process
   waitForProcess proc_handle
-  -- removeFile "compilation_out/main"
-  -- removeFile "compilation_out/main.asm"
-  -- removeFile "compilation_out/main.o"
-  
+
 main :: IO()
 main = do
   args <- getArgs

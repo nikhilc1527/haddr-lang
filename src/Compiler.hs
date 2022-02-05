@@ -12,6 +12,9 @@ import Data.Foldable
 
 import qualified Debug.Trace as Trace
 
+register_list :: [String]
+register_list = ["rdi", "rsi", "rcx", "rdx", "r8", "r9"]
+
 data Operand = Register String | Addr String | ProcName String | Literal Int deriving (Show, Eq)
 
 data Instruction =
@@ -44,19 +47,19 @@ data Instruction =
 data Symbol =
   Sym_Variable { stackPos :: Int, typename :: Type } |
   Sym_Function { name :: String, params :: [Type], res :: Type }
-  deriving (Eq)
+  deriving (Show, Eq)
 
 data CompilerState = CompilerState {
     counter :: Int,
     symtab :: Map.Map String Symbol,
     rsp :: Int,
     instructions :: [Instruction],
-    bss :: [[String]]
+    bss :: [[String]],
+    cur_block :: Int
   } deriving (Eq)
 
 initialCompilerState :: CompilerState
-initialCompilerState = CompilerState 0 Map.empty 0 [] []
--- type Compiler = Expression -> State CompilerState [Instruction]
+initialCompilerState = CompilerState 0 Map.empty 0 [] [] 0
 newtype Compiler a = Compiler { run :: (CompilerState) -> (CompilerState, a) }
 
 instance Functor Compiler where
@@ -83,6 +86,9 @@ instance Monad Compiler where
 get_state :: Compiler CompilerState
 get_state = Compiler $ \state -> (state, state)
 
+get_counter :: Compiler Int
+get_counter = Compiler $ \state -> (state, state.counter)
+
 put_state :: CompilerState -> Compiler ()
 put_state new_state = Compiler $ const (new_state, ())
 
@@ -103,6 +109,12 @@ modify_rsp mod = Compiler $ \state -> (state { rsp = mod $ state.rsp }, () )
 
 increment_counter :: Compiler ()
 increment_counter = Compiler $ \state -> (state { counter = state.counter + 1 }, () )
+
+get_block :: Compiler Int
+get_block = Compiler $ \state -> (state, state.cur_block)
+
+put_block :: Int -> Compiler ()
+put_block block = Compiler $ \state -> (state { cur_block = block }, ())
 
 printOperand :: Operand -> String
 printOperand (Register s) = s
@@ -188,10 +200,15 @@ compile (Exp_String varname) = do
       put_instrs $
         [Mov (Register "rax") (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]"))]
       return Type_Int
+    (Just (Sym_Variable pos typename@(Type_Pointer _))) -> do
+      put_instrs $
+        [Mov (Register "rax") (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]"))]
+      return typename
     (Just (Sym_Variable pos typename@(Type_Arr _ _))) -> do
       put_instrs $
         [Lea (Register "rax") (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]"))]
       return typename
+    (Just bla) -> error $ "unhandled: " ++ (show bla)
     (Nothing) -> error $ "variable " ++ varname ++ " does not exist"
 compile arrindex@(Exp_ArrIndex arr index) = do
   lvalue_type <- compile_lvalue arrindex
@@ -270,7 +287,7 @@ compile (Exp_LessThan e1 e2) = do
   put_instr $ Push $ Register "rax"
   b <- compile e2
   increment_counter
-  counter <- (.counter) <$> get_state
+  counter <- get_counter
   let label1 = ("COMPARISON" ++ (show counter))
   let label2 = ("COMPARISON_END" ++ (show counter))
   put_instrs $ [
@@ -289,7 +306,7 @@ compile (Exp_GreaterEqual e1 e2) = do
   put_instr $ Push $ Register "rax"
   b <- compile e2
   increment_counter
-  counter <- (.counter) <$> get_state
+  counter <- get_counter
   let label1 = ("COMPARISON" ++ (show counter))
   let label2 = ("COMPARISON_END" ++ (show counter))
   put_instrs $ [
@@ -308,7 +325,7 @@ compile (Exp_LessEqual e1 e2) = do
   put_instr $ Push $ Register "rax"
   b <- compile e2
   increment_counter
-  counter <- (.counter) <$> get_state
+  counter <- get_counter
   let label1 = ("COMPARISON" ++ (show counter))
   let label2 = ("COMPARISON_END" ++ (show counter))
   put_instrs $ [
@@ -327,7 +344,7 @@ compile (Exp_GreaterThan e1 e2) = do
   put_instr $ Push $ Register "rax"
   b <- compile e2
   increment_counter
-  counter <- (.counter) <$> get_state
+  counter <- get_counter
   let label1 = ("COMPARISON" ++ (show counter))
   let label2 = ("COMPARISON_END" ++ (show counter))
   put_instrs $ [
@@ -346,7 +363,7 @@ compile (Exp_Equality e1 e2) = do
   put_instr $ Push $ Register "rax"
   b <- compile e2
   increment_counter
-  counter <- (.counter) <$> get_state
+  counter <- get_counter
   let label1 = ("COMPARISON" ++ (show counter))
   let label2 = ("COMPARISON_END" ++ (show counter))
   put_instrs $ [
@@ -397,7 +414,7 @@ compile (Exp_If cond_exp true_exp false_exp) = do
 
 compile (Exp_While cond_exp body_exp) = do
   increment_counter
-  counter <- (.counter) <$> get_state
+  counter <- get_counter
   let label1 = ("LOOP_START" ++ (show counter))
   let label2 = ("LOOP_END" ++ (show counter))
   put_instr $ Label label1
@@ -441,7 +458,7 @@ compile (Exp_Proc (Exp_String name) args body) = do
   put_instrs $ [ Add (Register "rsp") (Literal $ 8 * (length args)) ] <> [ Pop (Register "rbp"), Ret ]
   return Type_Empty
     where
-      args_registers = take (length args) $ Register <$> ["rdi", "rsi", "rcx", "rdx", "r8", "r9"]
+      args_registers = take (length args) $ Register <$> register_list
       push_args :: [Expression] -> [Operand] -> Compiler Type
       push_args [] [] = return Type_Empty
       push_args ((Exp_Declaration arg_name typename _):args) (reg:regs) = do
@@ -450,12 +467,6 @@ compile (Exp_Proc (Exp_String name) args body) = do
         put_instr $ Push reg
         rest <- push_args args regs
         return Type_Empty
-
-      -- push_args ((Exp_String arg_name):args) (reg:regs) = do
-      --   modify_state $ \st -> st { rsp = st.rsp + 8, symtab = Map.insert arg_name (Sym_Variable (st.rsp + 8) Type_Int) st.symtab }
-      --   put_instr $ Push reg
-      --   rest <- push_args args regs
-      --   return Type_Empty
 
 compile (Exp_ProcCall name' args') = do
   let name = (\e -> case e of
@@ -467,7 +478,7 @@ compile (Exp_ProcCall name' args') = do
   put_instr $ Call $ ProcName name
   return Type_Empty
     where
-      args_registers = take (length args') $ Register <$> ["rdi", "rsi", "rcx", "rdx"]
+      args_registers = take (length args') $ Register <$> register_list
       process_args :: [Expression] -> Compiler ()
       process_args [] = return ()
       process_args (exp:exprs) = do
@@ -477,19 +488,29 @@ compile (Exp_ProcCall name' args') = do
         process_args exprs
         modify_state $ (\st -> st { rsp = st.rsp - 8 })
 
+compile (Exp_Return exp) = do
+  block <- get_block
+  compile exp
+  put_instr $ Jmp $ "BLOCKEND" ++ (show block)
+  return Type_Empty
+
 compile (Exp_SourceBlock exprs) = do
   old_state <- get_state
+  increment_counter
+  block <- get_counter
+  old_block <- get_block
+  put_block block
+
   compile_exprs exprs
+  
   new_state <- get_state
   modify_state $ \st -> st { rsp = old_state.rsp, symtab = old_state.symtab }
-  put_instrs $ [ Add (Register "rsp") (Literal $ 0 - old_state.rsp + new_state.rsp) ]
+  put_block old_block
+  put_instrs $ [ Label $ "BLOCKEND" ++ (show block), Add (Register "rsp") (Literal $ new_state.rsp - old_state.rsp) ]
   return Type_Empty
     where
       compile_exprs :: [Expression] -> Compiler ()
-      compile_exprs (exp:exprs) = do
-        compile exp
-        compile_exprs exprs
-      compile_exprs [] = return ()
+      compile_exprs = foldr ((>>) . compile) (pure ())
 
 compile (Exp_Empty) = return Type_Empty
 

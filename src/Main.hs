@@ -5,6 +5,8 @@ import System.Exit
 import System.Environment
 import Text.Printf
 import Data.Bool
+import Data.Char
+import Data.List
 import Data.Foldable
 import qualified Data.Map as Map
 import qualified System.Process as Process
@@ -17,18 +19,7 @@ import Control.Concurrent
 import Control.Monad.State
 
 import Parser
-import Compiler
-
-instrs :: String -> String
-instrs str = 
-  let
-    uncommented = uncomment str
-    input = Input uncommented 0
-    parsed_either =  sourceFileParser.run input
-    parsed = either (\err -> error $ show_err err str) (fst) $ parsed_either
-    compiled = printInstrs $ sourceCompiler parsed
-  in
-    compiled
+import Compiler   
 
 parse :: String -> String
 parse str = 
@@ -39,12 +30,27 @@ parse str =
   in
     fold $ map (print_exp 0) parsed
 
+bssify :: (String, String) -> String
+bssify (str, name) = name ++ ": db " ++ (concat $ intersperse ", " $ ((++ ["0"]) . map (show . ord)) str) ++ "\n"
+
 src_to_asm :: String -> String
-src_to_asm input = initial_part ++ is ++ final_part
+src_to_asm input_str = 
+  "global _start\n" ++
+  (fold $ map (\s -> "extern " ++ s ++ "\n") procs) ++
+  "section .data\n" ++
+  (fold $ map bssify bss) ++
+  "section .text\n" ++
+  instructions_printed ++
+  start_proc
   where
-    is = instrs input
+    uncommented = uncomment input_str
+    input = Input uncommented 0
+    parsed_either = sourceFileParser.run input
+    parsed = either (\err -> error $ show_err err input_str) (fst) $ parsed_either
+    (instructions, bss, procs) = sourceCompiler parsed
+    instructions_printed = printInstrs instructions
     initial_part = "global _start\nextern printi\nextern putch\nextern puti\nextern unbuffer_term\nextern getch\nextern nonblock\nextern sleep_for\n\nsection .text\n\n"
-    final_part = "_start:\n\tpush rbp\n\tmov rbp, rsp\n\n\tcall main\n\n\tpop rbp\n\n\tmov rax, 60\n\tmov rdi, 0\n\tsyscall\n"  
+    start_proc = "_start:\n\tpush rbp\n\tmov rbp, rsp\n\n\tcall main\n\n\tpop rbp\n\n\tmov rax, 60\n\tmov rdi, 0\n\tsyscall\n"  
 
 dumpASMOfFile :: FilePath -> IO()
 dumpASMOfFile filepath = do

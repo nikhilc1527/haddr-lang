@@ -33,17 +33,14 @@
 
 void printi(int num) {
   printf("%d\n", num);
-  /* fflush(stdout); */
 }
 
 void putch(int c) {
   printf("%c", c);
-  /* fflush(stdout); */
 }
 
 void puti(int i) {
   printf("%d", i);
-  /* fflush(stdout); */
 }
 
 void sleep_for(useconds_t usec) {

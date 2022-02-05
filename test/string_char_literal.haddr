@@ -1,0 +1,10 @@
+proc main() {
+  let str: *i8 = "hello world";
+  puts(str);
+  str[0] = 'Y';
+  str[5] = 'w';
+  str[6] = ' ';
+  str[9] = 'c';
+  str[10] = 's';
+  puts(str);
+}

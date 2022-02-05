@@ -19,14 +19,21 @@ uncomment ('/':'/':rest) = dropWhile (/= '\n') rest
 uncomment (a:rest) = a:(uncomment rest)
 
 data Type = 
-  Type_Int |
+  Type_I64 |
+  Type_I8 |
   Type_String |
   Type_Bool |
   Type_Pointer Type |
   Type_Arr Type Int |
-  Type_Func |
+  Type_Func [Type] Type |
   Type_Empty
   deriving (Eq, Show)
+
+sizeof :: Type -> Int
+sizeof (Type_I64) = 8
+sizeof (Type_I8) = 1
+sizeof (Type_Pointer _) = 8
+sizeof (Type_Arr subtype len) = len * (sizeof subtype)
 
 data Eq i => Error i
   = EndOfInput  -- Expected more input, but there is nothing
@@ -141,7 +148,7 @@ stringP = sequenceA . map charP
 
 spanP :: Eq i => (i -> Bool) -> Parser i [i]
 spanP pred = Parser $ \input ->
-  let (a, b) = span (pred) input.str
+  let (a, b) = span pred input.str
   in case a of
        [] -> case b of
               [] -> Left $ EndOfInput
@@ -229,8 +236,20 @@ floatP = do
 numP :: Parser Char Expression
 numP = (Exp_Float <$> floatP) <|> (Exp_Int <$> integerP)
 
+charLiteralP :: Parser Char Expression
+-- charLiteralP = do
+--   ws *> charP '\''
+--   char <- satisfyP $ const True
+--   charP '\'' <* ws
+--   return $ Exp_Int $ ord char
+charLiteralP = (ws *> charP '\'') *> (Exp_Int <$> ord <$> (satisfyP $ const True)) <* (charP '\'' <* ws)
+
 stringLiteralP :: Parser Char Expression
-stringLiteralP = error "string literal parser is not implemented"
+stringLiteralP = do
+  ws *> charP '"'
+  str <- spanP (/= '"')
+  charP '"' <* ws
+  return $ Exp_StringLiteral $ str
 
 ws :: Parser Char String
 ws = Parser $ \input -> Right $ let (a, b) = span isSpace input.str in (a, input {str=b, pos=input.pos + (length a)})
@@ -384,7 +403,8 @@ controlStructureP = ifP <|> whileP
 typeP :: Parser Char Type
 typeP =
   ((wcharP '*') *> (Type_Pointer <$> typeP)) <|>
-  (const Type_Int <$> stringP "i64") <|> 
+  (const Type_I64 <$> stringP "i64") <|> 
+  (const Type_I8 <$> stringP "i8") <|> 
   (Type_Arr <$> (wcharP '[' *> typeP) <*> (wcharP ';' *> (integerP) <* wcharP ']')) 
 
 declarationP :: Parser Char Expression
@@ -425,7 +445,7 @@ expressionP = head operators
       operators = foldr (\ ops_list new_ops -> let op = operatorLevelP (head new_ops) ops_list in (op:new_ops)) [parseFinal] operators_raw
 
 parseFinal :: Parser Char Expression
-parseFinal = numP <|> (Exp_String <$> wordP) <|> parensP -- <|> stringLiteralP
+parseFinal = numP <|> (Exp_String <$> wordP) <|> parensP <|> stringLiteralP <|> charLiteralP
   where
     parensP = do
       wcharP '('

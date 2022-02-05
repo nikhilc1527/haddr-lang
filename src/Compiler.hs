@@ -17,6 +17,11 @@ register_list = ["rdi", "rsi", "rcx", "rdx", "r8", "r9"]
 
 data Operand = Register String | Addr String | ProcName String | Literal Int deriving (Show, Eq)
 
+rax = Register "rax"
+rbx = Register "rbx"
+rbp = Register "rbp"
+rsp = Register "rsp"
+
 data Instruction =
   Comment String |
   EmptyLine |
@@ -54,12 +59,26 @@ data CompilerState = CompilerState {
     symtab :: Map.Map String Symbol,
     rsp :: Int,
     instructions :: [Instruction],
-    bss :: [[String]],
-    cur_block :: Int
+    bss :: [(String, String)],
+    cur_block :: Int,
+    procs :: [String]
   } deriving (Eq)
 
+initialSymtab :: Map.Map String Symbol
+initialSymtab = Map.fromList 
+  [
+    ("getch", Sym_Function "getch" [] Type_I64),
+    ("putch", Sym_Function "putch" [Type_I64] Type_Empty),
+    ("unbuffer_term", Sym_Function "unbuffer_term" [] Type_Empty),
+    ("nonblock", Sym_Function "nonblock" [] Type_Empty),
+    ("puti", Sym_Function "puti" [Type_I64] Type_Empty),
+    ("puts", Sym_Function "puts" [Type_Pointer Type_I64] Type_Empty),
+    ("sleep_for", Sym_Function "sleep_for" [Type_I64] Type_Empty)
+  ]
+
 initialCompilerState :: CompilerState
-initialCompilerState = CompilerState 0 Map.empty 0 [] [] 0
+initialCompilerState = CompilerState 0 initialSymtab 0 [] [] 0 []
+
 newtype Compiler a = Compiler { run :: (CompilerState) -> (CompilerState, a) }
 
 instance Functor Compiler where
@@ -145,11 +164,6 @@ printInstrs ((Label s):rest) = s ++ ":\n" ++ (printInstrs rest)
 printInstrs ((Ret):rest) = "\tret\n" ++ (printInstrs rest)
 printInstrs ((Call e1):rest) = "\tcall " ++ (printOperand e1) ++ "\n" ++ (printInstrs rest)
 
-sizeof :: Type -> Int
-sizeof (Type_Int) = 8
-sizeof (Type_Pointer _) = 8
-sizeof (Type_Arr subtype len) = len * (sizeof subtype)
-
 compile_lvalue :: Expression -> Compiler Type
 compile_lvalue (Exp_String varname) = do
   state <- get_state
@@ -157,8 +171,8 @@ compile_lvalue (Exp_String varname) = do
   case var of
     (Just (Sym_Variable pos typename)) -> do
       put_instrs $
-        [ Mov (Register "rax") (Register "rbp"),
-          Sub (Register "rax") (Literal $ pos)
+        [ Mov rax rbp,
+          Sub rax (Literal $ pos)
         ]
       return $ typename
     (Nothing) -> error $ "variable " ++ varname ++ " does not exist"
@@ -166,232 +180,248 @@ compile_lvalue (Exp_ArrIndex lvalue index) = do
   lvalue_type <- compile_lvalue lvalue
   case lvalue_type of
     Type_Arr subtype sublen -> do
-      put_instr $ Push $ Register "rax"
+      put_instr $ Push $ rax
       index_val <- compile index
       put_instrs $
-        [ Mov (Register "rbx") (Literal $ sizeof subtype `div` 8),
-          Mul (Register "rbx"),
-          Mov (Register "rbx") (Register "rax"),
-          Pop $ Register "rax",
-          Lea (Register "rax") (Addr $ ("rax [8*rbx]"))
+        [ Mov rbx (Literal $ sizeof subtype),
+          Mul rbx,
+          Mov rbx rax,
+          Pop $ rax,
+          Lea rax (Addr $ ("rax [rbx]"))
         ]
       return $ subtype
     Type_Pointer subtype -> do
-      put_instr $ Mov (Register "rax") (Addr "QWORD [rax]")
-      put_instr $ Push $ Register "rax"
+      put_instr $ Mov rax (Addr "QWORD [rax]")
+      put_instr $ Push $ rax
       index_val <- compile index
       put_instrs $
-        [ Mov (Register "rbx") (Literal $ sizeof subtype `div` 8),
-          Mul (Register "rbx"),
-          Mov (Register "rbx") (Register "rax"),
-          Pop $ Register "rax",
-          Lea (Register "rax") (Addr $ ("rax [8*rbx]"))
+        [ Mov rbx (Literal $ sizeof subtype),
+          Mul rbx,
+          Mov rbx rax,
+          Pop $ rax,
+          Lea rax (Addr $ ("rax [rbx]"))
         ]
       return $ subtype
 compile_lvalue e = error $ "expression \n" ++ (print_exp 0 e) ++ "is not allowed in lhs right now"
 
 compile :: Expression -> Compiler Type
-compile (Exp_Int i) = (put_instrs $ [Mov (Register "rax") (Literal i)]) >> (return Type_Empty)
+compile (Exp_Int i) = (put_instrs $ [Mov rax (Literal i)]) >> (return Type_Empty)
+compile (Exp_StringLiteral s) = do
+  counter <- get_counter
+  increment_counter
+  let bssname = "BSS" ++ (show counter)
+  Compiler $ \state -> (state { bss = state.bss ++ [(s, bssname)] }, ())
+  put_instr $ Mov rax (Addr bssname)
+  return $ Type_Pointer Type_I8
 compile (Exp_String varname) = do
   state <- get_state
   let var = Map.lookup varname state.symtab
   case var of
-    (Just (Sym_Variable pos Type_Int)) -> do
+    (Just (Sym_Variable pos Type_I64)) -> do
       put_instrs $
-        [Mov (Register "rax") (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]"))]
-      return Type_Int
+        [Mov rax (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]"))]
+      return Type_I64
+    (Just (Sym_Variable pos Type_I8)) -> do
+      put_instrs $
+        [Mov (Register "al") (Addr $ ("BYTE [rbp-" ++ (show pos) ++ "]"))]
+      return Type_I64
     (Just (Sym_Variable pos typename@(Type_Pointer _))) -> do
       put_instrs $
-        [Mov (Register "rax") (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]"))]
+        [Mov rax (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]"))]
       return typename
     (Just (Sym_Variable pos typename@(Type_Arr _ _))) -> do
       put_instrs $
-        [Lea (Register "rax") (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]"))]
+        [Lea rax (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]"))]
       return typename
+    (Just (Sym_Function name params res)) -> do
+      put_instr $ Mov rax (Addr name)
+      Compiler $ \state -> (state { procs = state.procs ++ [name] }, ())
+      return $ Type_Func params res
     (Just bla) -> error $ "unhandled: " ++ (show bla)
     (Nothing) -> error $ "variable " ++ varname ++ " does not exist"
 compile arrindex@(Exp_ArrIndex arr index) = do
   lvalue_type <- compile_lvalue arrindex
-  put_instr $ Mov (Register "rax") (Addr "QWORD [rax]")
+  put_instr $ Mov rax (Addr "QWORD [rax]")
   return Type_Empty
 compile (Exp_Plus e1 e2) = do
   a <- compile e1
   case e2 of
     (Exp_Int i) -> do
-      put_instr $ Add (Register "rax") (Literal i)
+      put_instr $ Add rax (Literal i)
       return Type_Empty
     _ -> do
-      put_instr $ Push (Register "rax")
+      put_instr $ Push rax
       b <- compile e2
       put_instrs $
-        [Pop (Register "rbx")] <>
-        [Add (Register "rax") (Register "rbx")]
-      return Type_Int
+        [Pop rbx] <>
+        [Add rax rbx]
+      return Type_I64
 compile (Exp_Minus e1 e2) = do
   a <- compile e1
   case e2 of
     (Exp_Int i) -> do
-      put_instr $ Sub (Register "rax") (Literal i)
+      put_instr $ Sub rax (Literal i)
       return Type_Empty
     _ -> do
-      put_instr $ Push (Register "rax")
+      put_instr $ Push rax
       b <- compile e2
       put_instrs $
-        [Mov (Register "rbx") (Register "rax")] <>
-        [Pop (Register "rax")] <>
-        [Sub (Register "rax") (Register "rbx")]
-      return Type_Int
+        [Mov rbx rax] <>
+        [Pop rax] <>
+        [Sub rax rbx]
+      return Type_I64
 compile (Exp_Mult e1 e2) = do
   a <- compile e1
-  put_instr $ Push $ Register "rax"
+  put_instr $ Push $ rax
   b <- compile e2
   put_instrs $
-    [Pop $ Register "rbx"] <>
-    [Mul (Register "rbx")]
+    [Pop $ rbx] <>
+    [Mul rbx]
   return Type_Empty
 compile (Exp_Div e1 e2) = do
   a <- compile e1
-  put_instr $ Push (Register "rax")
+  put_instr $ Push rax
   b <- compile e2
   put_instrs $
-    [Mov (Register "rbx") (Register "rax")] <>
-    [Pop $ Register "rax"] <>
+    [Mov rbx rax] <>
+    [Pop $ rax] <>
     [Mov (Register "rdx") (Literal 0)] <>
-    [Div (Register "rbx")]
+    [Div rbx]
   return Type_Empty
 compile (Exp_Mod e1 e2) = do
   a <- compile e1
-  put_instr $ Push (Register "rax")
+  put_instr $ Push rax
   b <- compile e2
   put_instrs $
-    [Mov (Register "rbx") (Register "rax")] <>
-    [Pop $ Register "rax"] <>
+    [Mov rbx rax] <>
+    [Pop $ rax] <>
     [Mov (Register "rdx") (Literal 0)] <>
-    [Div (Register "rbx")] <>
-    [Mov (Register "rax") (Register "rdx")]
+    [Div rbx] <>
+    [Mov rax (Register "rdx")]
   return Type_Empty
 
 compile (Exp_Assignment left_exp right_exp) = do
   lhs <- compile_lvalue left_exp
-  put_instr $ Push $ Register "rax"
+  put_instr $ Push $ rax
   rhs <- compile right_exp
-  put_instrs $
-    [Mov (Register "rbx") (Register "rax")] <>
-    [Pop $ Register "rax"] <>
-    [Mov (Addr $ "QWORD [rax]") (Register "rbx")]
+  put_instr $ Mov rbx rax
+  put_instr $ Pop $ rax
+  case sizeof lhs of
+    1 -> put_instr $ Mov (Addr $ "BYTE [rax]") (Register "bl")
+    8 -> put_instr $ Mov (Addr $ "QWORD [rax]") rbx
   put_instr EmptyLine
   return Type_Empty
 
 compile (Exp_LessThan e1 e2) = do
   a <- compile e1
-  put_instr $ Push $ Register "rax"
+  put_instr $ Push $ rax
   b <- compile e2
   increment_counter
   counter <- get_counter
   let label1 = ("COMPARISON" ++ (show counter))
   let label2 = ("COMPARISON_END" ++ (show counter))
   put_instrs $ [
-      Pop $ Register "rbx",
-      Cmp (Register "rbx") (Register "rax"),
+      Pop $ rbx,
+      Cmp rbx rax,
       Jlt $ label1,
-      Mov (Register "rax") (Literal 0),
+      Mov rax (Literal 0),
       Jmp label2,
       Label label1, 
-      Mov (Register "rax") (Literal 1),
+      Mov rax (Literal 1),
       Label label2
     ]
   return Type_Bool
 compile (Exp_GreaterEqual e1 e2) = do
   a <- compile e1
-  put_instr $ Push $ Register "rax"
+  put_instr $ Push $ rax
   b <- compile e2
   increment_counter
   counter <- get_counter
   let label1 = ("COMPARISON" ++ (show counter))
   let label2 = ("COMPARISON_END" ++ (show counter))
   put_instrs $ [
-      Pop $ Register "rbx",
-      Cmp (Register "rax") (Register "rbx"),
+      Pop $ rbx,
+      Cmp rax rbx,
       Jle $ label1,
-      Mov (Register "rax") (Literal 0),
+      Mov rax (Literal 0),
       Jmp label2,
       Label label1, 
-      Mov (Register "rax") (Literal 1),
+      Mov rax (Literal 1),
       Label label2
     ]
   return Type_Bool
 compile (Exp_LessEqual e1 e2) = do
   a <- compile e1
-  put_instr $ Push $ Register "rax"
+  put_instr $ Push $ rax
   b <- compile e2
   increment_counter
   counter <- get_counter
   let label1 = ("COMPARISON" ++ (show counter))
   let label2 = ("COMPARISON_END" ++ (show counter))
   put_instrs $ [
-      Pop $ Register "rbx",
-      Cmp (Register "rbx") (Register "rax"),
+      Pop $ rbx,
+      Cmp rbx rax,
       Jle $ label1,
-      Mov (Register "rax") (Literal 0),
+      Mov rax (Literal 0),
       Jmp label2,
       Label label1, 
-      Mov (Register "rax") (Literal 1),
+      Mov rax (Literal 1),
       Label label2
     ]
   return Type_Bool
 compile (Exp_GreaterThan e1 e2) = do
   a <- compile e1
-  put_instr $ Push $ Register "rax"
+  put_instr $ Push $ rax
   b <- compile e2
   increment_counter
   counter <- get_counter
   let label1 = ("COMPARISON" ++ (show counter))
   let label2 = ("COMPARISON_END" ++ (show counter))
   put_instrs $ [
-      Pop $ Register "rbx",
-      Cmp (Register "rax") (Register "rbx"),
+      Pop $ rbx,
+      Cmp rax rbx,
       Jlt $ label1,
-      Mov (Register "rax") (Literal 0),
+      Mov rax (Literal 0),
       Jmp label2,
       Label label1, 
-      Mov (Register "rax") (Literal 1),
+      Mov rax (Literal 1),
       Label label2
     ]
   return Type_Bool
 compile (Exp_Equality e1 e2) = do
   a <- compile e1
-  put_instr $ Push $ Register "rax"
+  put_instr $ Push $ rax
   b <- compile e2
   increment_counter
   counter <- get_counter
   let label1 = ("COMPARISON" ++ (show counter))
   let label2 = ("COMPARISON_END" ++ (show counter))
   put_instrs $ [
-      Pop $ Register "rbx",
-      Cmp (Register "rax") (Register "rbx"),
+      Pop $ rbx,
+      Cmp rax rbx,
       Je $ label1,
-      Mov (Register "rax") (Literal 0),
+      Mov rax (Literal 0),
       Jmp label2,
       Label label1, 
-      Mov (Register "rax") (Literal 1),
+      Mov rax (Literal 1),
       Label label2
     ]
   return Type_Bool
 compile (Exp_And e1 e2) = do
   a <- compile e1
-  put_instr $ Push $ Register "rax"
+  put_instr $ Push $ rax
   b <- compile e2
   put_instrs $
-    [Pop $ Register "rbx"] <>
-    [And (Register "rax") (Register "rbx")]
+    [Pop $ rbx] <>
+    [And rax rbx]
   return Type_Bool
 compile (Exp_Or e1 e2) = do
   a <- compile e1
-  put_instr $ Push $ Register "rax"
+  put_instr $ Push $ rax
   b <- compile e2
   put_instrs $
-    [Pop $ Register "rbx"] <>
-    [Or (Register "rax") (Register "rbx")]
+    [Pop $ rbx] <>
+    [Or rax rbx]
   return Type_Bool
 
 compile (Exp_If cond_exp true_exp false_exp) = do
@@ -403,7 +433,7 @@ compile (Exp_If cond_exp true_exp false_exp) = do
   case cond_type of
     Type_Bool -> return ()
     _ -> error "condition expression has to be boolean"
-  put_instrs $ [Cmp (Register "rax") (Literal 0), Je label1]
+  put_instrs $ [Cmp rax (Literal 0), Je label1]
   true_instrs <- compile true_exp
   put_instrs $ [Jmp label2, Label label1]
   case false_exp of
@@ -422,7 +452,7 @@ compile (Exp_While cond_exp body_exp) = do
   case cond_type of
     Type_Bool -> return ()
     _ -> error "condition expression has to be boolean"
-  put_instrs $ [Cmp (Register "rax") (Literal 0), Je label2]
+  put_instrs $ [Cmp rax (Literal 0), Je label2]
   body_instrs <- compile body_exp
   put_instrs $ [Jmp label1, Label label2]
   return Type_Empty
@@ -434,28 +464,36 @@ compile (Exp_Declaration varname typename rhs_exp) = do
     (Just pos) -> error $ "variable exists: " ++ varname
     (Nothing) -> do
       case typename of
-        (Type_Int) -> do
+        (Type_Pointer subtype) -> do
           state <- get_state
           let pos = state.rsp + 8
           put_state $ state { symtab = Map.insert varname (Sym_Variable pos typename) state.symtab, rsp = pos }
           compile rhs_exp
-          put_instrs $ [ Push $ Register "rax" ]
+          put_instrs $ [ Push $ rax ]
+        (Type_I64) -> do
+          state <- get_state
+          let pos = state.rsp + 8
+          put_state $ state { symtab = Map.insert varname (Sym_Variable pos typename) state.symtab, rsp = pos }
+          compile rhs_exp
+          put_instrs $ [ Push $ rax ]
         (Type_Arr subtype length) -> do
           state <- get_state
           let subsize = sizeof subtype
           let arr_size = subsize * length
           put_state $ state { rsp = state.rsp + arr_size, symtab = Map.insert varname (Sym_Variable (state.rsp + arr_size) typename) state.symtab }
-          put_instrs $ [ Sub (Register "rsp") (Literal $ length * subsize) ]
+          put_instrs $ [ Sub rsp (Literal $ length * subsize) ]
       return Type_Empty
 
 compile (Exp_Proc (Exp_String name) args body) = do
-  put_instrs $ [ Label name, Push $ Register "rbp", Mov (Register "rbp") (Register "rsp") ]
+  let functype = Sym_Function name (map (\(Exp_Declaration _ typename _) -> typename) args) Type_Empty
+  modify_symtab $ Map.insert name functype
+  put_instrs $ [ Label name, Push $ rbp, Mov rbp rsp ]
   old_state <- get_state
   push_args_instrs <- push_args args args_registers
   body_instrs <- compile body
   new_state <- get_state
   put_state $ new_state { rsp = old_state.rsp, symtab = old_state.symtab }
-  put_instrs $ [ Add (Register "rsp") (Literal $ 8 * (length args)) ] <> [ Pop (Register "rbp"), Ret ]
+  put_instrs $ [ Add rsp (Literal $ 8 * (length args)) ] <> [ Pop rbp, Ret ]
   return Type_Empty
     where
       args_registers = take (length args) $ Register <$> register_list
@@ -468,23 +506,24 @@ compile (Exp_Proc (Exp_String name) args body) = do
         rest <- push_args args regs
         return Type_Empty
 
-compile (Exp_ProcCall name' args') = do
-  let name = (\e -> case e of
-                         Exp_String s -> s
-                         _ -> error $ "called name must be a string(for now)" ++ (show args')) name'
-  process_args $ args'
+compile (Exp_ProcCall procname args) = do
+  functype <- compile procname
+  let (Type_Func params_type res_type) = functype
+  put_instr $ Push $ rax
+  process_args $ args
   
   put_instrs $ (Pop <$> reverse args_registers) 
-  put_instr $ Call $ ProcName name
+  put_instr $ Pop $ rax
+  put_instr $ Call $ rax
   return Type_Empty
     where
-      args_registers = take (length args') $ Register <$> register_list
+      args_registers = take (length args) $ Register <$> register_list
       process_args :: [Expression] -> Compiler ()
       process_args [] = return ()
       process_args (exp:exprs) = do
         compile exp
         modify_state $ (\st -> st { rsp = st.rsp + 8 })
-        put_instr $ Push $ Register "rax"
+        put_instr $ Push $ rax
         process_args exprs
         modify_state $ (\st -> st { rsp = st.rsp - 8 })
 
@@ -506,18 +545,18 @@ compile (Exp_SourceBlock exprs) = do
   new_state <- get_state
   modify_state $ \st -> st { rsp = old_state.rsp, symtab = old_state.symtab }
   put_block old_block
-  put_instrs $ [ Label $ "BLOCKEND" ++ (show block), Add (Register "rsp") (Literal $ new_state.rsp - old_state.rsp) ]
+  put_instrs $ [ Label $ "BLOCKEND" ++ (show block), Add rsp (Literal $ new_state.rsp - old_state.rsp) ]
   return Type_Empty
     where
       compile_exprs :: [Expression] -> Compiler ()
-      compile_exprs = foldr ((>>) . compile) (pure ())
+      compile_exprs = foldr ((>>) . (>> put_instr EmptyLine) . compile) (pure ())
 
 compile (Exp_Empty) = return Type_Empty
 
-compile e = error $ "unhandled expression: \n" ++ (print_exp 0 e)
+compile e = error $ "unhandled expression in compiler: \n" ++ (print_exp 0 e)
 
-sourceCompiler :: [Expression] -> [Instruction]
-sourceCompiler exprs = (fst $ compiled.run initialCompilerState).instructions
+sourceCompiler :: [Expression] -> ([Instruction], [(String, String)], [String])
+sourceCompiler exprs = (compile_final_state.instructions, compile_final_state.bss, compile_final_state.procs)
   where
     compiled = compile_all exprs
     compile_all :: [Expression] -> Compiler ()
@@ -525,3 +564,5 @@ sourceCompiler exprs = (fst $ compiled.run initialCompilerState).instructions
       compile e
       compile_all es
     compile_all [] = return ()
+    
+    compile_final_state = fst $ compiled.run initialCompilerState

@@ -371,6 +371,7 @@ controlStructureP = ifP <|> whileP
 
 typeP :: Parser Char Type
 typeP =
+  ((wcharP '*') *> (Type_Pointer <$> typeP)) <|>
   (const Type_Int <$> stringP "i64") <|> 
   (Type_Arr <$> (wcharP '[' *> typeP) <*> (wcharP ';' *> (integerP) <* wcharP ']')) 
 

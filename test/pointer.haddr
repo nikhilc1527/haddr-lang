@@ -1,0 +1,41 @@
+proc sum(arr: *[i64; 5]) {
+  let res: i64 = 0;
+  let i: i64 = 0;
+  while (i < 5) {
+    let j: i64 = 0;
+    while (j < 5) {
+      res = res + arr[i][j];
+      j = j + 1;
+    }
+    i = i + 1;
+  }
+  res;
+}
+
+proc main() {
+  let arr: [[i64; 5]; 5] = 0;
+  let i: i64 = 0;
+  while (i < 5) {
+    let j: i64 = 0;
+    while (j < 5) {
+      if (i < j) arr[i][j] = i + 1;
+      else arr[i][j] = j + 1;
+      j = j + 1;
+    }
+    i = i + 1;
+  }
+
+  i = 0;
+  while (i < 5) {
+    let j: i64 = 0;
+    while (j < 5) {
+      puti(arr[i][j]);
+      putch(32);
+      j = j + 1;
+    }
+    putch(10);
+    i = i + 1;
+  }
+
+  printi(sum(arr));
+}

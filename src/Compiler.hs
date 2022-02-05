@@ -152,19 +152,31 @@ compile_lvalue (Exp_String varname) = do
     (Nothing) -> error $ "variable " ++ varname ++ " does not exist"
 compile_lvalue (Exp_ArrIndex lvalue index) = do
   lvalue_type <- compile_lvalue lvalue
-  let (Type_Arr subtype sublen) = lvalue_type
-  put_instr $ Push $ Register "rax"
-  index_val <- compile index
-  put_instrs $
-    [ Mov (Register "rbx") (Literal $ sizeof subtype `div` 8),
-      Mul (Register "rbx"),
-      Mov (Register "rbx") (Register "rax"),
-      Pop $ Register "rax",
-      Lea (Register "rax") (Addr $ ("rax [8*rbx]"))
-    ]
-  return $ subtype
+  case lvalue_type of
+    Type_Arr subtype sublen -> do
+      put_instr $ Push $ Register "rax"
+      index_val <- compile index
+      put_instrs $
+        [ Mov (Register "rbx") (Literal $ sizeof subtype `div` 8),
+          Mul (Register "rbx"),
+          Mov (Register "rbx") (Register "rax"),
+          Pop $ Register "rax",
+          Lea (Register "rax") (Addr $ ("rax [8*rbx]"))
+        ]
+      return $ subtype
+    Type_Pointer subtype -> do
+      put_instr $ Mov (Register "rax") (Addr "QWORD [rax]")
+      put_instr $ Push $ Register "rax"
+      index_val <- compile index
+      put_instrs $
+        [ Mov (Register "rbx") (Literal $ sizeof subtype `div` 8),
+          Mul (Register "rbx"),
+          Mov (Register "rbx") (Register "rax"),
+          Pop $ Register "rax",
+          Lea (Register "rax") (Addr $ ("rax [8*rbx]"))
+        ]
+      return $ subtype
 compile_lvalue e = error $ "expression \n" ++ (print_exp 0 e) ++ "is not allowed in lhs right now"
-
 
 compile :: Expression -> Compiler Type
 compile (Exp_Int i) = (put_instrs $ [Mov (Register "rax") (Literal i)]) >> (return Type_Empty)
@@ -172,21 +184,18 @@ compile (Exp_String varname) = do
   state <- get_state
   let var = Map.lookup varname state.symtab
   case var of
-    (Just pos) -> do
+    (Just (Sym_Variable pos Type_Int)) -> do
       put_instrs $
-        [Mov (Register "rax") (Addr $ ("QWORD [rbp-" ++ (show pos.stackPos) ++ "]"))]
-      return Type_Empty
+        [Mov (Register "rax") (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]"))]
+      return Type_Int
+    (Just (Sym_Variable pos typename@(Type_Arr _ _))) -> do
+      put_instrs $
+        [Lea (Register "rax") (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]"))]
+      return typename
     (Nothing) -> error $ "variable " ++ varname ++ " does not exist"
 compile arrindex@(Exp_ArrIndex arr index) = do
   lvalue_type <- compile_lvalue arrindex
-  -- put_instr $ Push $ Register "rax"
-  -- index_val <- compile index
-  put_instrs $
-    [ -- Mov (Register "rax") (Register "rbx"),
-      -- Pop $ Register "rax",
-      -- Add (Register "rax") (Register "rbx"),
-      Mov (Register "rax") (Addr "QWORD [rax]")
-    ]
+  put_instr $ Mov (Register "rax") (Addr "QWORD [rax]")
   return Type_Empty
 compile (Exp_Plus e1 e2) = do
   a <- compile e1

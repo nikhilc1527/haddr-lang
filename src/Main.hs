@@ -22,7 +22,8 @@ import Compiler
 instrs :: String -> String
 instrs str = 
   let
-    input = Input str 0
+    uncommented = uncomment str
+    input = Input uncommented 0
     parsed_either =  sourceFileParser.run input
     parsed = either (\err -> error $ show_err err str) (fst) $ parsed_either
     compiled = printInstrs $ sourceCompiler parsed

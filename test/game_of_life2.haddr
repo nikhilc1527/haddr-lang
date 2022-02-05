@@ -31,6 +31,26 @@ proc print_board(board: *[i64; 21], BOARD_WIDTH: i64, BOARD_HEIGHT: i64) {
   }
 }
 
+proc get_neighbors(board: *[i64; 21], i: i64, j: i64, BOARD_WIDTH: i64, BOARD_HEIGHT: i64) {
+  let neighbors : i64 = 0;
+
+  let x : i64 = 0 - 1;
+  while (x < 2) {
+    let y : i64 = 0 - 1;
+    while (y < 2) {
+      let a : i64 = (i + x + BOARD_HEIGHT) % BOARD_HEIGHT;
+      let b : i64 = (j + y + BOARD_WIDTH) % BOARD_WIDTH;
+      let c : i64 = board[a][b];
+      neighbors = neighbors + c;
+      y = y + 1;
+    }
+    x = x + 1;
+  }
+  neighbors = neighbors - board[i][j];
+
+  neighbors;
+}
+
 proc gen_board(old_board: *[i64; 21], new_board: *[i64; 21], BOARD_WIDTH: i64, BOARD_HEIGHT: i64) {
   0;
 }
@@ -83,21 +103,8 @@ proc main() {
       j = 0;
       while (j < BOARD_WIDTH) {
         let neighbors : i64 = 0;
+        neighbors = get_neighbors(board, i, j, BOARD_WIDTH, BOARD_HEIGHT);
 
-        let x : i64 = 0 - 1;
-        while (x < 2) {
-          let y : i64 = 0 - 1;
-          while (y < 2) {
-            let a : i64 = (i + x + BOARD_HEIGHT) % BOARD_HEIGHT;
-            let b : i64 = (j + y + BOARD_WIDTH) % BOARD_WIDTH;
-            let c : i64 = board[a][b];
-            neighbors = neighbors + c;
-            y = y + 1;
-          }
-          x = x + 1;
-        }
-
-        neighbors = neighbors - board[i][j];
         let cur_val : i64 = board[i][j];
         let new_val : i64 = 0;
         if (cur_val && (neighbors == 2 || neighbors == 3))

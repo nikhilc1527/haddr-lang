@@ -12,6 +12,12 @@ import Text.Printf
 import qualified Data.HashMap as Map
 import Control.Applicative
 
+uncomment :: String -> String
+uncomment [] = []
+uncomment input@(_:[]) = input
+uncomment ('/':'/':rest) = dropWhile (/= '\n') rest
+uncomment (a:rest) = a:(uncomment rest)
+
 data Type = 
   Type_Int |
   Type_String |

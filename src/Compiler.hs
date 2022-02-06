@@ -4,6 +4,7 @@ import qualified Data.Map as Map
 import Text.Printf
 
 import Data.Bool
+import qualified Data.Set as Set
 
 import Parser
 
@@ -61,7 +62,7 @@ data CompilerState = CompilerState {
     instructions :: [Instruction],
     bss :: [(String, String)],
     cur_block :: Int,
-    procs :: [String]
+    procs :: Set.Set String
   } deriving (Eq)
 
 initialSymtab :: Map.Map String Symbol
@@ -77,7 +78,7 @@ initialSymtab = Map.fromList
   ]
 
 initialCompilerState :: CompilerState
-initialCompilerState = CompilerState 0 initialSymtab 0 [] [] 0 []
+initialCompilerState = CompilerState 0 initialSymtab 0 [] [] 0 Set.empty
 
 newtype Compiler a = Compiler { run :: (CompilerState) -> (CompilerState, a) }
 
@@ -235,7 +236,7 @@ compile (Exp_String varname) = do
       return typename
     (Just (Sym_Function name params res)) -> do
       put_instr $ Mov rax (Addr name)
-      Compiler $ \state -> (state { procs = state.procs ++ [name] }, ())
+      Compiler $ \state -> (state { procs = Set.insert name state.procs }, ())
       return $ Type_Func params res
     (Just bla) -> error $ "unhandled: " ++ (show bla)
     (Nothing) -> error $ "variable " ++ varname ++ " does not exist"
@@ -556,7 +557,7 @@ compile (Exp_Empty) = return Type_Empty
 compile e = error $ "unhandled expression in compiler: \n" ++ (print_exp 0 e)
 
 sourceCompiler :: [Expression] -> ([Instruction], [(String, String)], [String])
-sourceCompiler exprs = (compile_final_state.instructions, compile_final_state.bss, compile_final_state.procs)
+sourceCompiler exprs = (compile_final_state.instructions, compile_final_state.bss, Set.toList $ compile_final_state.procs)
   where
     compiled = compile_all exprs
     compile_all :: [Expression] -> Compiler ()

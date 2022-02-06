@@ -49,7 +49,6 @@ src_to_asm input_str =
     parsed = either (\err -> error $ show_err err input_str) (fst) $ parsed_either
     (instructions, bss, procs) = sourceCompiler parsed
     instructions_printed = printInstrs instructions
-    initial_part = "global _start\nextern printi\nextern putch\nextern puti\nextern unbuffer_term\nextern getch\nextern nonblock\nextern sleep_for\n\nsection .text\n\n"
     start_proc = "_start:\n\tpush rbp\n\tmov rbp, rsp\n\n\tcall main\n\n\tpop rbp\n\n\tmov rax, 60\n\tmov rdi, 0\n\tsyscall\n"  
 
 dumpASMOfFile :: FilePath -> IO()

@@ -237,11 +237,6 @@ numP :: Parser Char Expression
 numP = (Exp_Float <$> floatP) <|> (Exp_Int <$> integerP)
 
 charLiteralP :: Parser Char Expression
--- charLiteralP = do
---   ws *> charP '\''
---   char <- satisfyP $ const True
---   charP '\'' <* ws
---   return $ Exp_Int $ ord char
 charLiteralP = (ws *> charP '\'') *> (Exp_Int <$> ord <$> (satisfyP $ const True)) <* (charP '\'' <* ws)
 
 stringLiteralP :: Parser Char Expression
@@ -253,12 +248,6 @@ stringLiteralP = do
 
 ws :: Parser Char String
 ws = Parser $ \input -> Right $ let (a, b) = span isSpace input.str in (a, input {str=b, pos=input.pos + (length a)})
-
-tryParse :: a -> Parser i a -> Parser i a
-tryParse def parser = Parser $ \input ->
-                                 case parser.run input of
-                                   Left err -> return (def, input)
-                                   Right a -> Right a
 
 wordP :: Parser Char String
 wordP = spanP (\c -> isAlpha c || c == '_')

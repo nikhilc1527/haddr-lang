@@ -7,4 +7,5 @@ proc main() {
   str[9] = 'c';
   str[10] = 's';
   puts(str);
+  puts("gud bye");
 }

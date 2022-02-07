@@ -1,4 +1,4 @@
-proc main() {
+proc main() -> () {
   let i: i64 = 1;
   let lcm: i64 = 1;
   let max: i64 = 20;

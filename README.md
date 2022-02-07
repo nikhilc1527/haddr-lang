@@ -8,6 +8,8 @@ If you see some problems, please don't hesitate to submit a pull request!
 ## Feature Todo List
 
 ### Short Term
+- [ ] preprocessor macros
+- [ ] for loop
 - [ ] update the readme
 - [ ] make proper grammar specification
 - [x] string/char literals
@@ -18,6 +20,12 @@ If you see some problems, please don't hesitate to submit a pull request!
 - [ ] static linking (get rid of libc), make list of syscalls, std library
 - [ ] improve ui, add flag to run vs compile (-c, -r), output directory/files
 - [ ] tuples
+- [ ] different sized int/uint types
+- [ ] make if statements/blocks into expressions
+- [ ] global variables in (bss)
+- [ ] compile time constants, arrays initialized to size of compile time constant
+- [ ] graphviz of control flow
+- [ ] profiling
 
 ### Long Term
 - [ ] proper testing
@@ -26,9 +34,15 @@ If you see some problems, please don't hesitate to submit a pull request!
 - [ ] tagged union
 - [ ] closures (maybe)
 - [ ] modules
-- [ ] parse header file to make pseudo-module for c ffi
+- [ ] parse c header file to make pseudo-module for c ffi
 - [ ] implicit currying functions
+- [ ] separate type checking into its own step
+- [ ] type inference
+- [ ] find mechanism to do RAII (destructors / defer)
+- [ ] use block ([reference](https://youtu.be/QM1iUe6IofM?t=2502))
 
 ### Super Long Term
+- [ ] lsp
 - [ ] monads
 - [ ] self hosting
+- [ ] asm optimizations (using linear IR)

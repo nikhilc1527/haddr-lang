@@ -1,21 +1,21 @@
-proc move_left(n : i64) {
+proc move_left(n : i64) -> () {
   putch(27);
   putch('[');
   puti(n);
   putch('D');
 }
-proc move_up(n : i64) {
+proc move_up(n : i64) -> () {
   putch(27);
   putch('[');
   puti(n);
   putch('A');
 }
-proc reset_board(width : i64, height : i64) {
+proc reset_board(width : i64, height : i64) -> () {
   move_left(width);
   move_up(height);
 }
 
-proc print_board(board: *[i64; 21], BOARD_WIDTH: i64, BOARD_HEIGHT: i64) {
+proc print_board(board: *[i64; 21], BOARD_WIDTH: i64, BOARD_HEIGHT: i64) -> () {
   let i: i64 = 0;
   while (i < BOARD_HEIGHT) {
     let j: i64 = 0;
@@ -31,7 +31,7 @@ proc print_board(board: *[i64; 21], BOARD_WIDTH: i64, BOARD_HEIGHT: i64) {
   }
 }
 
-proc get_neighbors(board: *[i64; 21], i: i64, j: i64, BOARD_WIDTH: i64, BOARD_HEIGHT: i64) {
+proc get_neighbors(board: *[i64; 21], i: i64, j: i64, BOARD_WIDTH: i64, BOARD_HEIGHT: i64) -> i64 {
   let neighbors : i64 = 0;
 
   let x : i64 = 0 - 1;
@@ -51,7 +51,7 @@ proc get_neighbors(board: *[i64; 21], i: i64, j: i64, BOARD_WIDTH: i64, BOARD_HE
   return neighbors;
 }
 
-proc gen_board(old_board: *[i64; 21], new_board: *[i64; 21], BOARD_WIDTH: i64, BOARD_HEIGHT: i64) {
+proc gen_board(old_board: *[i64; 21], new_board: *[i64; 21], BOARD_WIDTH: i64, BOARD_HEIGHT: i64) -> () {
   let i: i64 = 0;
   while (i < BOARD_HEIGHT) {
     let j: i64 = 0;
@@ -75,7 +75,7 @@ proc gen_board(old_board: *[i64; 21], new_board: *[i64; 21], BOARD_WIDTH: i64, B
   }
 }
 
-proc copy_board(old_board: *[i64; 21], new_board: *[i64; 21], BOARD_WIDTH: i64, BOARD_HEIGHT: i64) {
+proc copy_board(old_board: *[i64; 21], new_board: *[i64; 21], BOARD_WIDTH: i64, BOARD_HEIGHT: i64) -> () {
   let i: i64 = 0;
   while (i < BOARD_HEIGHT) {
     let j: i64 = 0;
@@ -87,7 +87,7 @@ proc copy_board(old_board: *[i64; 21], new_board: *[i64; 21], BOARD_WIDTH: i64, 
   }
 }
 
-proc main() {
+proc main() -> () {
   unbuffer_term();
   nonblock();
 

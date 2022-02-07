@@ -1,4 +1,4 @@
-proc main() {
+proc main() -> () {
   let largest: i64 = 0;
   let i: i64 = 100;
   while (i < 1000) {

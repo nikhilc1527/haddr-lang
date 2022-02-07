@@ -1,20 +1,21 @@
-func resize_arr arr arr_len new_len do
-     new_arr = [new_len];
-     i = 0;
-     while i < arr_len do
-           new_arr[i] = arr[i];
-           i = i + 1;
-     end;
-     new_arr
-end;
-
-dp_len = 1000000;
-dp = [dp_len];
-dp[1] = 1;
-dp[2] = 2;
-dp[4] = 3;
-
-i = 0;
-while i < 20 do
-      
-end;
+proc main() -> () {
+  let max: i64 = 0;
+  let max_i: i64 = 0;
+  let i: i64 = 0;
+  while (i < 1000000) {
+    let iters: i64 = 0;
+    let n: i64 = i;
+    while (n > 1) {
+      if (n % 2 == 0) n = n / 2;
+      else n = n * 3 + 1;
+      iters = iters + 1;
+    }
+    if (iters > max) {
+      max = iters;
+      max_i = i;
+    }
+    i = i + 1;
+  }
+  printi(max);
+  printi(max_i);
+}

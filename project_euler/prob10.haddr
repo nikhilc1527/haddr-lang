@@ -1,4 +1,4 @@
-proc main() {
+proc main() -> () {
   let PRIME_LENGTH: i64 = 2000000;
   let primes: *i64 = malloc(PRIME_LENGTH * 8);
 

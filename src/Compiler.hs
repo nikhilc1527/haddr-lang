@@ -9,6 +9,7 @@ import qualified Data.Set as Set
 import Parser
 
 import Control.Applicative
+import Control.Exception
 import Data.Foldable
 
 import qualified Debug.Trace as Trace
@@ -70,17 +71,17 @@ data CompilerState = CompilerState {
 initialSymtab :: Map.Map String Symbol
 initialSymtab = Map.fromList 
   [
-    ("getch", Sym_Function "getch" [] Type_I64),
-    ("putch", Sym_Function "putch" [Type_I64] Type_Empty),
+    ("getch", Sym_Function "getch" [] Type_I8),
+    ("putch", Sym_Function "putch" [Type_I8] Type_Empty),
     ("unbuffer_term", Sym_Function "unbuffer_term" [] Type_Empty),
     ("nonblock", Sym_Function "nonblock" [] Type_Empty),
     ("flush_out", Sym_Function "flush_out" [] Type_Empty),
     ("puti", Sym_Function "puti" [Type_I64] Type_Empty),
     ("printi", Sym_Function "printi" [Type_I64] Type_Empty),
-    ("puts", Sym_Function "puts" [Type_Pointer Type_I64] Type_Empty),
+    ("puts", Sym_Function "puts" [Type_Pointer Type_I8] Type_Empty),
     ("sleep_for", Sym_Function "sleep_for" [Type_I64] Type_Empty),
     ("free", Sym_Function "free" [Type_Pointer Type_I64] Type_Empty),
-    ("malloc", Sym_Function "malloc" [] (Type_Pointer Type_I64))
+    ("malloc", Sym_Function "malloc" [Type_I64] (Type_Pointer Type_I64))
   ]
 
 initialCompilerState :: CompilerState
@@ -171,6 +172,16 @@ printInstrs ((Label s):rest) = s ++ ":\n" ++ (printInstrs rest)
 printInstrs ((Ret):rest) = "\tret\n" ++ (printInstrs rest)
 printInstrs ((Call e1):rest) = "\tcall " ++ (printOperand e1) ++ "\n" ++ (printInstrs rest)
 
+type_equivalent :: Type -> Type -> Bool
+type_equivalent = (==)
+
+type_can_be :: Type -> Type -> Bool
+type_can_be (Type_Arr sub1 len) (Type_Pointer sub2) = sub1 `type_can_be` sub2
+type_can_be (Type_Pointer sub1) (Type_I64) = True
+type_can_be (Type_I8) (Type_I64) = True
+type_can_be (Type_I64) (Type_I8) = True
+type_can_be t1 t2 = t1 == t2
+
 compile_lvalue :: Expression -> Compiler Type
 compile_lvalue (Exp_String varname) = do
   state <- get_state
@@ -183,7 +194,7 @@ compile_lvalue (Exp_String varname) = do
         ]
       return $ typename
     (Nothing) -> error $ "variable " ++ varname ++ " does not exist"
-compile_lvalue (Exp_ArrIndex lvalue index) = do
+compile_lvalue arrindexexp@(Exp_ArrIndex lvalue index) = do
   lvalue_type <- compile_lvalue lvalue
   case lvalue_type of
     Type_Arr subtype sublen -> do
@@ -209,10 +220,11 @@ compile_lvalue (Exp_ArrIndex lvalue index) = do
           Lea rax (Addr $ ("rax [rbx]"))
         ]
       return $ subtype
+    o -> error $ "cannot take index of type " ++ (show o) ++ " in expression\n" ++ (print_exp 0 arrindexexp)
 compile_lvalue e = error $ "expression \n" ++ (print_exp 0 e) ++ "is not allowed in lhs right now"
 
 compile :: Expression -> Compiler Type
-compile (Exp_Int i) = (put_instrs $ [Mov rax (Literal i)]) >> (return Type_Empty)
+compile (Exp_Int i) = (put_instrs $ [Mov rax (Literal i)]) >> (return Type_I64)
 compile (Exp_StringLiteral s) = do
   counter <- get_counter
   increment_counter
@@ -250,67 +262,81 @@ compile arrindex@(Exp_ArrIndex arr index) = do
   lvalue_type <- compile_lvalue arrindex
   case lvalue_type of
     Type_I64 -> put_instr $ Mov rax (Addr "QWORD [rax]")
+    Type_Pointer _ -> put_instr $ Mov rax (Addr "QWORD [rax]")
+    Type_Arr _ _ -> put_instr $ Mov rax (Addr "QWORD [rax]")
     Type_I8 -> do
       put_instr $ Mov rbx $ Literal 0
       put_instr $ Mov bl (Addr "BYTE [rax]")
       put_instr $ Mov rax rbx
-  return Type_Empty
+  return lvalue_type
 compile (Exp_Plus e1 e2) = do
   a <- compile e1
   case e2 of
     (Exp_Int i) -> do
       put_instr $ Add rax (Literal i)
-      return Type_Empty
+      return a
     _ -> do
       put_instr $ Push rax
       b <- compile e2
+      if (a == b || (a == Type_I64 && b == Type_I8) || (a == Type_I8 && b == Type_I64) || (good_types a b)) then return () else error $ "operator (+): wrong arguments of type " ++ (show a) ++ " and " ++ (show b)
       put_instrs $
         [Pop rbx] <>
         [Add rax rbx]
-      return Type_I64
+      return a
+        where
+          good_types (Type_Pointer _) (Type_I64) = True
+          good_types a b = False
 compile (Exp_Minus e1 e2) = do
   a <- compile e1
   case e2 of
     (Exp_Int i) -> do
       put_instr $ Sub rax (Literal i)
-      return Type_Empty
+      return a
     _ -> do
       put_instr $ Push rax
       b <- compile e2
+      if (a == b || (a == Type_I64 && b == Type_I8) || (a == Type_I8 && b == Type_I64) || (good_types a b)) then return () else error $ "operator (-): wrong arguments of type " ++ (show a) ++ " and " ++ (show b)
       put_instrs $
         [Mov rbx rax] <>
         [Pop rax] <>
         [Sub rax rbx]
-      return Type_I64
+      return a
+        where
+          good_types (Type_Pointer _) (Type_I64) = True
+          good_types (Type_Pointer _) (Type_Pointer _) = True
+          good_types a b = False
 compile (Exp_Mult e1 e2) = do
   a <- compile e1
   put_instr $ Push $ rax
   b <- compile e2
+  if (a == b || (a == Type_I64 && b == Type_I8) || (a == Type_I8 && b == Type_I64)) then return () else error $ "operator (*): wrong arguments of type " ++ (show a) ++ " and " ++ (show b)
   put_instrs $
     [Pop $ rbx] <>
     [Mul rbx]
-  return Type_Empty
+  return a
 compile (Exp_Div e1 e2) = do
   a <- compile e1
   put_instr $ Push rax
   b <- compile e2
+  if (a == b || (a == Type_I64 && b == Type_I8) || (a == Type_I8 && b == Type_I64)) then return () else error $ "operator (/): wrong arguments of type " ++ (show a) ++ " and " ++ (show b)
   put_instrs $
     [Mov rbx rax] <>
     [Pop $ rax] <>
     [Mov (Register "rdx") (Literal 0)] <>
     [Div rbx]
-  return Type_Empty
+  return a
 compile (Exp_Mod e1 e2) = do
   a <- compile e1
   put_instr $ Push rax
   b <- compile e2
+  if (a == b || (a == Type_I64 && b == Type_I8) || (a == Type_I8 && b == Type_I64)) then return () else error $ "operator (%): wrong arguments of type " ++ (show a) ++ " and " ++ (show b)
   put_instrs $
     [Mov rbx rax] <>
     [Pop $ rax] <>
     [Mov (Register "rdx") (Literal 0)] <>
     [Div rbx] <>
     [Mov rax (Register "rdx")]
-  return Type_Empty
+  return a
 
 compile (Exp_Assignment left_exp right_exp) = do
   lhs <- compile_lvalue left_exp
@@ -502,12 +528,12 @@ compile (Exp_Declaration varname typename rhs_exp) = do
           put_instrs $ [ Sub rsp (Literal $ length * subsize) ]
       return Type_Empty
 
-compile (Exp_Proc (Exp_String name) args body) = do
-  let functype = Sym_Function name (map (\(Exp_Declaration _ typename _) -> typename) args) Type_Empty
+compile (Exp_Proc (Exp_String name) args body rettype) = do
+  let functype = Sym_Function name (map snd args) rettype
   modify_symtab $ Map.insert name functype
   put_instrs $ [ Label name, Push $ rbp, Mov rbp rsp ]
   old_state <- get_state
-  push_args_instrs <- push_args args args_registers
+  push_args args args_registers
   body_instrs <- compile body
   new_state <- get_state
   put_state $ new_state { rsp = old_state.rsp, symtab = old_state.symtab }
@@ -515,34 +541,38 @@ compile (Exp_Proc (Exp_String name) args body) = do
   return Type_Empty
     where
       args_registers = take (length args) $ Register <$> register_list
-      push_args :: [Expression] -> [Operand] -> Compiler Type
-      push_args [] [] = return Type_Empty
-      push_args ((Exp_Declaration arg_name typename _):args) (reg:regs) = do
+      push_args :: [(String, Type)] -> [Operand] -> Compiler ()
+      push_args [] [] = return ()
+      push_args ((arg_name, typename):args) (reg:regs) = do
         let size = sizeof typename
         modify_state $ \st -> st { rsp = st.rsp + size, symtab = Map.insert arg_name (Sym_Variable (st.rsp + size) typename) st.symtab }
         put_instr $ Push reg
-        rest <- push_args args regs
-        return Type_Empty
+        push_args args regs
+        return ()
 
-compile (Exp_ProcCall procname args) = do
+compile proccallexp@(Exp_ProcCall procname args) = do
   functype <- compile procname
   let (Type_Func params_type res_type) = functype
+  if (length params_type /= length args) then error $ "expected " ++ (show $ length params_type) ++ " parameters but got " ++ (show $ length args) else return ()
   put_instr $ Push $ rax
-  process_args $ args
+  process_args args params_type
   
   put_instrs $ (Pop <$> reverse args_registers) 
   put_instr $ Pop $ rax
   put_instr $ Call $ rax
-  return Type_Empty
+  return res_type
     where
       args_registers = take (length args) $ Register <$> register_list
-      process_args :: [Expression] -> Compiler ()
-      process_args [] = return ()
-      process_args (exp:exprs) = do
-        compile exp
+      process_args :: [Expression] -> [Type] -> Compiler ()
+      process_args [] [] = return ()
+      process_args s [] = error $ "extra parameters in proc call: " ++ (show s)
+      process_args [] s = error $ "not enough parameters in proc call: " ++ (show s)
+      process_args (exp:exprs) (paramtype:params) = do
+        curparamtype <- compile exp
+        if (curparamtype `type_can_be` paramtype) then (return ()) else error $ ("wrong paramter type: expected " ++ (show paramtype) ++ " but got " ++ (show curparamtype) ++ " in: \n" ++ (print_exp 0 proccallexp))
         modify_state $ (\st -> st { rsp = st.rsp + 8 })
         put_instr $ Push $ rax
-        process_args exprs
+        process_args exprs params
         modify_state $ (\st -> st { rsp = st.rsp - 8 })
 
 compile (Exp_Return exp) = do

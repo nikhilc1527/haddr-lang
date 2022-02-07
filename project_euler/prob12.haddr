@@ -1,26 +1,27 @@
-func get_num_factors num do
-     res = 1;
-     i = 2;
-     while num > 1 do
-          j = 1;
-          while num % i == 0 do
-                num = num / i;
-                j = j + 1;
-          end;
-          res = res * j;
-          i = i + 1;
-     end;
-     res
-end;
+proc get_num_factors(num: i64) -> i64 {
+  let res: i64 = 1;
+  let i: i64 = 2;
+  while (num > 1) {
+    let j: i64 = 1;
+    while (num % i == 0) {
+      num = num / i;
+      j = j + 1;
+    }
+    res = res * j;
+    i = i + 1;
+  }
+  return res;
+}
 
-i = 1;
-n = 0;
-MAX_DIV = 50;
-divs = get_num_factors(n);
-while divs < MAX_DIV do
-      n = n + i;
-      i = i + 1;
-      divs = get_num_factors(n);
-      // puti(n); . " : "; puti(divs); . 10;
-end;
-puti(n);
+proc main() -> () {
+  let i: i64 = 1;
+  let n: i64 = 0;
+  let MAX_DIV: i64 = 500;
+  let divs: i64 = get_num_factors(n);
+  while (divs < MAX_DIV) {
+    n = n + i;
+    i = i + 1;
+    divs = get_num_factors(n);
+  }
+  printi(n);
+}

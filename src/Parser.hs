@@ -158,7 +158,7 @@ spanP pred = Parser $ \input ->
 data Expression =
   Exp_If Expression Expression Expression |
   Exp_While Expression Expression |
-  Exp_Proc Expression [Expression] Expression |
+  Exp_Proc Expression [(String, Type)] Expression Type |
   Exp_ProcCall Expression [Expression] |
   Exp_Call Expression [Expression] |
   Exp_Plus Expression Expression |
@@ -195,7 +195,7 @@ sp = (flip replicate) ' '
 print_exp :: Int -> Expression -> String
 print_exp spaces (Exp_If cond exp_true exp_false) = (sp spaces) ++ "IF\n" ++ (print_exp (spaces+2) cond) ++ (print_exp (spaces+2) exp_true) ++ (print_exp (spaces+2) exp_false)
 print_exp spaces (Exp_While cond exp) = (sp spaces) ++ "WHILE\n" ++ (print_exp (spaces+2) cond) ++ (print_exp (spaces+2) exp)
-print_exp spaces (Exp_Proc name args body) = (sp spaces) ++ "PROC\n" ++ (print_exp (spaces+2) name) ++ (foldr (\ exp str -> (print_exp (spaces+2) exp) ++ str) "" args) ++ (print_exp (spaces+2) body)
+print_exp spaces (Exp_Proc name args body rettype) = (sp spaces) ++ "PROC\n" ++ (print_exp (spaces+2) name) ++ (foldr (\t s -> (show t) ++ "\n" ++ s) "" args) ++ (print_exp (spaces+2) body) ++ (sp $ spaces+2) ++ (show rettype)
 print_exp spaces (Exp_ProcCall name args) = (sp spaces) ++ "PROC CALL\n" ++ (print_exp (spaces+2) name) ++ (foldr (++) "" (map (print_exp $ spaces + 2) args))
 print_exp spaces (Exp_Plus e1 e2) = (sp spaces) ++ "PLUS\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_Minus e1 e2) = (sp spaces) ++ "MINUS\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
@@ -346,21 +346,24 @@ procP :: Parser Char Expression
 procP = do
   ws *> stringP "proc "
   func_name <- wss $ (Exp_String <$> wordP)
-  -- args <- (commas_to_list <$> expressionP) <|> (const [] <$> (wcharP '(' >> wcharP ')'))
   args <- do
     wcharP '('
     args <- argsP <|> nop []
     wcharP ')'
     return args
+  ws
+  stringP "->"
+  ws
+  rettype <- typeP
   body <- parseBlock <|> statementP
-  return $ Exp_Proc func_name args body
+  return $ Exp_Proc func_name args body rettype
     where
       argsP = do
         name <- wordP
         wcharP ':'
         typename <- typeP
         nexts <- (wcharP ',' *> argsP) <|> nop []
-        return $ (Exp_Declaration name typename Exp_Empty):nexts
+        return $ (name, typename):nexts
       commas_to_list :: Expression -> [Expression]
       commas_to_list (Exp_Comma e1 e2) = ((commas_to_list e1) ++ [e2])
       commas_to_list e = [e]
@@ -394,6 +397,7 @@ typeP =
   ((wcharP '*') *> (Type_Pointer <$> typeP)) <|>
   (const Type_I64 <$> stringP "i64") <|> 
   (const Type_I8 <$> stringP "i8") <|> 
+  (const Type_Empty <$> stringP "()") <|>
   (Type_Arr <$> (wcharP '[' *> typeP) <*> (wcharP ';' *> (integerP) <* wcharP ']')) 
 
 declarationP :: Parser Char Expression

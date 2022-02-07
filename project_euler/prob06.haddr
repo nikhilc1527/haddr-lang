@@ -1,4 +1,4 @@
-proc main() {
+proc main() -> () {
   let max: i64 = 100;
   let sum_of_squares: i64 = 0;
 

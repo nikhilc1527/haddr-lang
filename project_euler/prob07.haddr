@@ -1,4 +1,4 @@
-proc main() {
+proc main() -> () {
   let PRIME_LENGTH: i64 = 200000;
   let primes: [i64; 200000] = 0;
 

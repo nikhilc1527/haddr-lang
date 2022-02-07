@@ -15,22 +15,18 @@ If you see some problems, please don't hesitate to submit a pull request!
 - [ ] add type for function pointer
 - [ ] import statement (copy paste style)
 - [ ] lambdas (not closures)
-- [ ] static linking (get rid of libc)
-       make list of syscalls, std library
-- [ ] improve ui
-       add flag to run vs compile (-c, -r)
-       output directory/files
+- [ ] static linking (get rid of libc), make list of syscalls, std library
+- [ ] improve ui, add flag to run vs compile (-c, -r), output directory/files
 - [ ] tuples
 
 ### Long Term
 - [ ] proper testing
 - [ ] move to stack and ditch cabal
-- [ ] structs
-       figure out how to pass structs to functions in ABI
+- [ ] structs - figure out how to pass structs to functions in ABI
 - [ ] tagged union
 - [ ] closures (maybe)
 - [ ] modules
-       parse header file to make pseudo-module for c ffi
+- [ ] parse header file to make pseudo-module for c ffi
 - [ ] implicit currying functions
 
 ### Super Long Term

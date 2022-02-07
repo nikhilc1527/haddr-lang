@@ -6,4 +6,7 @@ proc main() {
   putch(111);
   putch(10);
   printi(123);
+  puti(123);
+  putch(10);
+  puts("hello world");
 }

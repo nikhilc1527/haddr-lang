@@ -1,14 +1,14 @@
 proc move_left(n : i64) {
   putch(27);
-  putch(91);
+  putch('[');
   puti(n);
-  putch(68);
+  putch('D');
 }
 proc move_up(n : i64) {
   putch(27);
-  putch(91);
+  putch('[');
   puti(n);
-  putch(65);
+  putch('A');
 }
 proc reset_board(width : i64, height : i64) {
   move_left(width);

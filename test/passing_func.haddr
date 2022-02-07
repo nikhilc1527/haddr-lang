@@ -1,12 +1,13 @@
-func f_one a do
-     a + 1
-end;
-
-func f_two a do a + 2 end;
-
-func apply f a do
-     f(a);
-end;
-
-. apply(f_one, 1);
-. apply(f_two, 1);
+proc f_one(a: i64) {
+     return a + 1;
+}
+proc f_two(a: i64) {
+     return a + 2;
+}
+proc apply(f: *i64, a: i64) {
+     return f(a);
+}
+proc main() {
+     printi(apply(f_one, 1));
+     printi(apply(f_two, 1));
+}

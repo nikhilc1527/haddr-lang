@@ -1,4 +1,4 @@
-proc fib(a) {
+proc fib(a: i64) {
   if (a < 2) a;
   else fib(a-2) + fib(a-1);
 }

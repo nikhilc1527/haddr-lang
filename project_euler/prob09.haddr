@@ -1,25 +1,50 @@
-LIMIT = 1000;
+// LIMIT = 1000;
 
-N = 1;
-not_done = 1;
-while N < 1000 && not_done do
-   sum = 0;
-   M = N + 1;
-   a = 0;
-   b = 0;
-   c = 0;
-   while sum < 1000 do
+// N = 1;
+// not_done = 1;
+// while N < 1000 && not_done do
+//    sum = 0;
+//    M = N + 1;
+//    a = 0;
+//    b = 0;
+//    c = 0;
+//    while sum < 1000 do
+//       a = M*M - N*N;
+//       b = 2 * M * N;
+//       c = M*M + N*N;
+//       sum = a + b + c;
+//       M = M + 1;
+//    end;
+//    if sum == 1000 do
+//       . "The output value is: ";
+//       puti(a * b * c);
+//       . 10;
+//       not_done = 0;
+//    else end;
+//    N = N + 1;
+// end;
+
+proc main() {
+  let LIMIT: i64 = 1000;
+  let N: i64 = 1;
+  let not_done: i8 = 1;
+  while (N < 1000 && not_done > 0) {
+    let sum: i64 = 0;
+    let M: i64 = N + 1;
+    let a: i64 = 0;
+    let b: i64 = 0;
+    let c: i64 = 0;
+    while (sum < 1000) {
       a = M*M - N*N;
       b = 2 * M * N;
       c = M*M + N*N;
       sum = a + b + c;
       M = M + 1;
-   end;
-   if sum == 1000 do
-      . "The output value is: ";
-      puti(a * b * c);
-      . 10;
+    }
+    if (sum == 1000) {
+      printi(a * b * c);
       not_done = 0;
-   else end;
-   N = N + 1;
-end;
+    }
+    N = N + 1;
+  }
+}

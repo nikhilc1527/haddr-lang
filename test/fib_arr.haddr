@@ -1,6 +1,6 @@
 proc main() {
-  let fiblen: i64 = 200000;
-  let fibs:[i64; 200000] = 0;
+  let fiblen: i64 = 40;
+  let fibs:[i64; 40] = 0;
   fibs[0] = 0;
   fibs[1] = 1;
   let n: i64 = 2;

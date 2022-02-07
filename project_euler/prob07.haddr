@@ -1,38 +1,34 @@
-PRIME_LENGTH = 200000;
-primes = [PRIME_LENGTH];
-
-N = 0;
-while N < PRIME_LENGTH do
-    primes[N] = 1;
-    N = N + 1;
-end;
-N = 2;
-while N < PRIME_LENGTH do
-    if primes[N] do
-        j = N * 2;
-        while j < PRIME_LENGTH do
-            primes[j] = 0;
-            j = j + N;
-        end;
-    else end;
-    N = N + 1;
-end;
-
-i = 2;
-N = 10001;
-while N > 0 do
-      is = primes[i];
-      if is do
-         N = N - 1;
-      else end;
-      i = i + 1;
-end;
-i = i - 1;
-
-puti(i); . 10;
-
-0
-
 proc main() {
-  
+  let PRIME_LENGTH: i64 = 200000;
+  let primes: [i64; 200000] = 0;
+
+  let i: i64 = 0;
+  while (i < PRIME_LENGTH) {
+    primes[i] = 1;
+    i = i + 1;
+  }
+  i = 2;
+  while (i < PRIME_LENGTH) {
+    if (primes[i] > 0) {
+      let j: i64 = i * 2;
+      while (j < PRIME_LENGTH) {
+        primes[j] = 0;
+        j = j + i;
+      }
+    }
+
+    i = i + 1;
+  }
+
+  i = 2;
+  let N: i64 = 10001;
+  while (N > 0) {
+    let is: i64 = primes[i];
+    if (is > 0) {
+      N = N - 1;
+    }
+    i = i + 1;
+  }
+  i = i - 1;
+  printi(i);
 }

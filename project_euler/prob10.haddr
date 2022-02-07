@@ -1,31 +1,33 @@
-PRIME_LENGTH = 2000000;
-primes = [PRIME_LENGTH];
+proc main() {
+  let PRIME_LENGTH: i64 = 2000000;
+  let primes: *i64 = malloc(PRIME_LENGTH * 8);
 
-N = 0;
-while N < PRIME_LENGTH do
-    primes[N] = 1;
-    N = N + 1;
-end;
+  let i: i64 = 0;
+  while (i < PRIME_LENGTH) {
+    primes[i] = 1;
+    i = i + 1;
+  }
+  i = 2;
+  while (i < PRIME_LENGTH) {
+    if (primes[i] > 0) {
+      let j: i64 = i * 2;
+      while (j < PRIME_LENGTH) {
+        primes[j] = 0;
+        j = j + i;
+      }
+    }
 
-N = 2;
-while N < PRIME_LENGTH do
-    if primes[N] do
-        j = N * 2;
-        while j < PRIME_LENGTH do
-            primes[j] = 0;
-            j = j + N;
-        end;
-    else end;
-    N = N + 1;
-end;
+    i = i + 1;
+  }
 
-i = 2;
-sum = 0;
-while i < PRIME_LENGTH do
-      if primes[i] do sum = sum + i else end;
-      i = i + 1;
-end;
-
-puti(sum);
-
-0
+  i = 2;
+  let sum: i64 = 0;
+  while (i < PRIME_LENGTH) {
+    if (primes[i] > 0) {
+      sum = sum + i;
+    }
+    i = i + 1;
+  }
+  printi(sum);
+  free(primes);
+}

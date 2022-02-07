@@ -5,5 +5,5 @@ proc main() {
   let d: i64 = 4;
  
   let sum: i64 = a + b * c - d;
-  printi(sum);
+  printi(a + b * c - d + 1);
 }

@@ -15,7 +15,7 @@ import Control.Applicative
 uncomment :: String -> String
 uncomment [] = []
 uncomment input@(_:[]) = input
-uncomment ('/':'/':rest) = dropWhile (/= '\n') rest
+uncomment ('/':'/':rest) = uncomment $ tail $ dropWhile (/= '\n') rest
 uncomment (a:rest) = a:(uncomment rest)
 
 data Type = 

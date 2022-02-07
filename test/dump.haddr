@@ -1,3 +1,0 @@
-proc main() {
-  printi(4 + 5);
-}

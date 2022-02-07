@@ -20,6 +20,8 @@ data Operand = Register String | Addr String | ProcName String | Literal Int der
 
 rax = Register "rax"
 rbx = Register "rbx"
+al = Register "al"
+bl = Register "bl"
 rbp = Register "rbp"
 rsp = Register "rsp"
 
@@ -72,13 +74,17 @@ initialSymtab = Map.fromList
     ("putch", Sym_Function "putch" [Type_I64] Type_Empty),
     ("unbuffer_term", Sym_Function "unbuffer_term" [] Type_Empty),
     ("nonblock", Sym_Function "nonblock" [] Type_Empty),
+    ("flush_out", Sym_Function "flush_out" [] Type_Empty),
     ("puti", Sym_Function "puti" [Type_I64] Type_Empty),
+    ("printi", Sym_Function "printi" [Type_I64] Type_Empty),
     ("puts", Sym_Function "puts" [Type_Pointer Type_I64] Type_Empty),
-    ("sleep_for", Sym_Function "sleep_for" [Type_I64] Type_Empty)
+    ("sleep_for", Sym_Function "sleep_for" [Type_I64] Type_Empty),
+    ("free", Sym_Function "free" [Type_Pointer Type_I64] Type_Empty),
+    ("malloc", Sym_Function "malloc" [] (Type_Pointer Type_I64))
   ]
 
 initialCompilerState :: CompilerState
-initialCompilerState = CompilerState 0 initialSymtab 0 [] [] 0 Set.empty
+initialCompilerState = CompilerState 0 initialSymtab 0 [] [] 0 (Set.fromList ["flush_out"])
 
 newtype Compiler a = Compiler { run :: (CompilerState) -> (CompilerState, a) }
 
@@ -199,7 +205,7 @@ compile_lvalue (Exp_ArrIndex lvalue index) = do
         [ Mov rbx (Literal $ sizeof subtype),
           Mul rbx,
           Mov rbx rax,
-          Pop $ rax,
+          Pop rax,
           Lea rax (Addr $ ("rax [rbx]"))
         ]
       return $ subtype
@@ -224,7 +230,7 @@ compile (Exp_String varname) = do
       return Type_I64
     (Just (Sym_Variable pos Type_I8)) -> do
       put_instrs $
-        [Mov (Register "al") (Addr $ ("BYTE [rbp-" ++ (show pos) ++ "]"))]
+        [Mov rbx $ Literal 0, Mov bl (Addr $ ("BYTE [rbp-" ++ (show pos) ++ "]")), Mov rax rbx]
       return Type_I64
     (Just (Sym_Variable pos typename@(Type_Pointer _))) -> do
       put_instrs $
@@ -242,7 +248,12 @@ compile (Exp_String varname) = do
     (Nothing) -> error $ "variable " ++ varname ++ " does not exist"
 compile arrindex@(Exp_ArrIndex arr index) = do
   lvalue_type <- compile_lvalue arrindex
-  put_instr $ Mov rax (Addr "QWORD [rax]")
+  case lvalue_type of
+    Type_I64 -> put_instr $ Mov rax (Addr "QWORD [rax]")
+    Type_I8 -> do
+      put_instr $ Mov rbx $ Literal 0
+      put_instr $ Mov bl (Addr "BYTE [rax]")
+      put_instr $ Mov rax rbx
   return Type_Empty
 compile (Exp_Plus e1 e2) = do
   a <- compile e1
@@ -477,6 +488,12 @@ compile (Exp_Declaration varname typename rhs_exp) = do
           put_state $ state { symtab = Map.insert varname (Sym_Variable pos typename) state.symtab, rsp = pos }
           compile rhs_exp
           put_instrs $ [ Push $ rax ]
+        (Type_I8) -> do
+          state <- get_state
+          let pos = state.rsp + 1
+          put_state $ state { symtab = Map.insert varname (Sym_Variable pos typename) state.symtab, rsp = pos }
+          compile rhs_exp
+          put_instrs $ [ Sub rsp $ Literal 1, Mov (Addr $ "BYTE [rsp]") al ]
         (Type_Arr subtype length) -> do
           state <- get_state
           let subsize = sizeof subtype

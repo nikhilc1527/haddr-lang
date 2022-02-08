@@ -10,6 +10,7 @@ If you see some problems, please don't hesitate to submit a pull request!
 ### Short Term
 - [ ] preprocessor macros
 - [x] for loop
+- [x] break/continue of loops
 - [ ] update the readme
 - [ ] make proper grammar specification
 - [x] string/char literals
@@ -26,8 +27,10 @@ If you see some problems, please don't hesitate to submit a pull request!
 - [ ] compile time constants, arrays initialized to size of compile time constant
 - [ ] graphviz of control flow
 - [ ] profiling
-- [ ] ++, --, & (address of), * (dereference) operators
+- [ ] ++, --, & (address of), * (dereference), +=, -= operators
 - [ ] add emacs/vim support
+- [ ] type check return statements
+- [ ] do nothing if statement doesnt do anything
 
 ### Long Term
 - [ ] generics (with typeclasses / type constraints)

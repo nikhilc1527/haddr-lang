@@ -595,7 +595,7 @@ compile (Exp_SourceBlock exprs) = do
   new_state <- get_state
   modify_state $ \st -> st { rsp = old_state.rsp, symtab = old_state.symtab }
   put_block old_block
-  put_instrs $ [ Label $ "BLOCKEND" ++ (show block), Add rsp (Literal $ new_state.rsp - old_state.rsp) ]
+  put_instrs $ [ Mov rax $ Literal 0, Label $ "BLOCKEND" ++ (show block), Add rsp (Literal $ new_state.rsp - old_state.rsp) ]
   return Type_Empty
     where
       compile_exprs :: [Expression] -> Compiler ()

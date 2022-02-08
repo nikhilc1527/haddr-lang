@@ -1,4 +1,4 @@
-proc isprime(i: i64) {
+proc isprime(i: i64) -> i64 {
       let res: i64 = 1;
       let j: i64 = 2;
       while ((j < i) * res) {
@@ -10,7 +10,7 @@ proc isprime(i: i64) {
       return res;
 }
 
-proc main() {
+proc main() -> () {
      let n: i64 = 1;
      while(n < 100) {
          let res: i64 = isprime(n);

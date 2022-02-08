@@ -1,0 +1,14 @@
+proc main() -> () {
+  let i: i64 = 0;
+  while (i < 10) {
+    putch(i + '0');
+    putch(' ');
+    i = i + 1;
+  }
+  putch(10);
+  for (let i: i64 = 0; j < 10; j = j + 1) {
+    putch(j + '0');
+    putch(' ');    
+  }
+  putch(10);
+}

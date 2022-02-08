@@ -9,7 +9,7 @@ If you see some problems, please don't hesitate to submit a pull request!
 
 ### Short Term
 - [ ] preprocessor macros
-- [ ] for loop
+- [x] for loop
 - [ ] update the readme
 - [ ] make proper grammar specification
 - [x] string/char literals
@@ -26,8 +26,11 @@ If you see some problems, please don't hesitate to submit a pull request!
 - [ ] compile time constants, arrays initialized to size of compile time constant
 - [ ] graphviz of control flow
 - [ ] profiling
+- [ ] ++, --, & (address of), * (dereference) operators
+- [ ] add emacs/vim support
 
 ### Long Term
+- [ ] generics (with typeclasses / type constraints)
 - [ ] proper testing
 - [ ] move to stack and ditch cabal
 - [ ] structs - figure out how to pass structs to functions in ABI

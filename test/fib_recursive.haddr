@@ -1,8 +1,8 @@
-proc fib(a: i64) {
+proc fib(a: i64) -> i64 {
   if (a < 2) a;
   else fib(a-2) + fib(a-1);
 }
 
-proc main() {
+proc main() -> () {
   printi(fib(30));
 }

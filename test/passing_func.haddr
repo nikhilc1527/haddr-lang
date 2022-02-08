@@ -1,13 +1,13 @@
-proc f_one(a: i64) {
+proc f_one(a: i64) -> i64 {
      return a + 1;
 }
-proc f_two(a: i64) {
+proc f_two(a: i64) -> i64 {
      return a + 2;
 }
-proc apply(f: *i64, a: i64) {
+proc apply(f: *i64, a: i64) -> i64 {
      return f(a);
 }
-proc main() {
+proc main() -> () {
      printi(apply(f_one, 1));
      printi(apply(f_two, 1));
 }

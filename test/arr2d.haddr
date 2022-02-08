@@ -1,4 +1,4 @@
-proc main() {
+proc main() -> () {
   let arr: [[i64; 3]; 2] = 0;
   arr[0][0] = 2;
   arr[0][1] = 3;

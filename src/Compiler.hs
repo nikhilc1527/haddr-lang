@@ -495,6 +495,8 @@ compile (Exp_While cond_exp body_exp) = do
   put_instrs $ [Jmp label1, Label label2]
   return Type_Empty
 
+compile (Exp_For init_exp cond_exp final_exp (Exp_SourceBlock body_exps)) = compile (Exp_SourceBlock [init_exp, (Exp_While cond_exp $ Exp_SourceBlock $ body_exps ++ [final_exp])])
+
 compile (Exp_Declaration varname typename rhs_exp) = do
   symtab <- (.symtab) <$> get_state
   let var = Map.lookup varname symtab

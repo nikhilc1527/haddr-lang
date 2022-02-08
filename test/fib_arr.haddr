@@ -1,4 +1,4 @@
-proc main() {
+proc main() -> () {
   let fiblen: i64 = 40;
   let fibs:[i64; 40] = 0;
   fibs[0] = 0;

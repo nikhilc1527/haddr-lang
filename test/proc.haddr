@@ -1,12 +1,12 @@
-proc testtwo(a, b, c) {
-  a + b + c + 5;
+proc testtwo(a, b, c) -> i64 {
+  return a + b + c + 5;
 }
 
-proc test(a, b) {
-  a + b + testtwo(a, b, 3);
+proc test(a, b) -> i64 {
+  return a + b + testtwo(a, b, 3);
 }
 
-proc main() {
+proc main() -> () {
   let i = 0;
   while (i < 3) {
     let j = test(1, 2);

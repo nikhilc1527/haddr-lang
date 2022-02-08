@@ -15,7 +15,7 @@ import Control.Applicative
 uncomment :: String -> String
 uncomment [] = []
 uncomment input@(_:[]) = input
-uncomment ('/':'/':rest) = uncomment $ tail $ dropWhile (/= '\n') rest
+uncomment ('/':'/':rest) = uncomment $ dropWhile (/= '\n') rest
 uncomment (a:rest) = a:(uncomment rest)
 
 data Type = 
@@ -158,6 +158,7 @@ spanP pred = Parser $ \input ->
 data Expression =
   Exp_If Expression Expression Expression |
   Exp_While Expression Expression |
+  Exp_For Expression Expression Expression Expression |
   Exp_Proc Expression [(String, Type)] Expression Type |
   Exp_ProcCall Expression [Expression] |
   Exp_Call Expression [Expression] |
@@ -342,6 +343,19 @@ whileP = do
   body <- parseBlock <|> statementP
   return $ Exp_While cond body
 
+forP :: Parser Char Expression
+forP = do
+  wss $ stringP "for"
+  wcharP '('
+  init <- declarationP <|> expressionP
+  wcharP ';'
+  cond <- expressionP
+  wcharP ';'
+  final <- expressionP
+  wcharP ')'
+  body <- parseBlock <|> statementP
+  return $ Exp_For init cond final body
+
 procP :: Parser Char Expression
 procP = do
   ws *> stringP "proc "
@@ -390,7 +404,7 @@ returnExpP = do
   return $ Exp_Return $ exp
 
 controlStructureP :: Parser Char Expression
-controlStructureP = ifP <|> whileP
+controlStructureP = ifP <|> whileP <|> forP
 
 typeP :: Parser Char Type
 typeP =

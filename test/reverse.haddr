@@ -1,4 +1,4 @@
-proc main() {
+proc main() -> () {
     let i = 12345;
     printi(i);
     let reverse = 0;

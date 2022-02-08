@@ -1,4 +1,4 @@
-proc main() {
+proc main() -> () {
   let a: i64 = 1;
   let b: i64 = 2;
   let c: i64 = 3;

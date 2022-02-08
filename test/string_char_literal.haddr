@@ -1,4 +1,4 @@
-proc main() {
+proc main() -> () {
   let str: *i8 = "hello world";
   puts(str);
   str[0] = 'Y';

@@ -16,35 +16,25 @@ proc reset_board(width : i64, height : i64) -> () {
 }
 
 proc print_board(board: *[i64; 21], BOARD_WIDTH: i64, BOARD_HEIGHT: i64) -> () {
-  let i: i64 = 0;
-  while (i < BOARD_HEIGHT) {
-    let j: i64 = 0;
-    while (j < BOARD_WIDTH) {
-       if (board[i][j] == 0)
-        putch(46);
-      else
-        putch(35);
-      j = j + 1;
+  for (let i: i64 = 0; i < BOARD_HEIGHT; i = i + 1) {
+    for (let j: i64 = 0; j < BOARD_WIDTH; j = j + 1) {
+       if (board[i][j] == 0) putch(46);
+      else putch(35);
     }
     putch(10);
-    i = i + 1;     
   }
 }
 
 proc get_neighbors(board: *[i64; 21], i: i64, j: i64, BOARD_WIDTH: i64, BOARD_HEIGHT: i64) -> i64 {
   let neighbors : i64 = 0;
 
-  let x : i64 = 0 - 1;
-  while (x < 2) {
-    let y : i64 = 0 - 1;
-    while (y < 2) {
+  for (let x : i64 = 0 - 1; x < 2; x = x + 1) {
+    for (let y : i64 = 0 - 1; y < 2; y = y + 1) {
       let a : i64 = (i + x + BOARD_HEIGHT) % BOARD_HEIGHT;
       let b : i64 = (j + y + BOARD_WIDTH) % BOARD_WIDTH;
       let c : i64 = board[a][b];
       neighbors = neighbors + c;
-      y = y + 1;
     }
-    x = x + 1;
   }
   neighbors = neighbors - board[i][j];
 
@@ -52,10 +42,8 @@ proc get_neighbors(board: *[i64; 21], i: i64, j: i64, BOARD_WIDTH: i64, BOARD_HE
 }
 
 proc gen_board(old_board: *[i64; 21], new_board: *[i64; 21], BOARD_WIDTH: i64, BOARD_HEIGHT: i64) -> () {
-  let i: i64 = 0;
-  while (i < BOARD_HEIGHT) {
-    let j: i64 = 0;
-    while (j < BOARD_WIDTH) {
+  for (let i: i64 = 0; i < BOARD_HEIGHT; i = i + 1) {
+    for (let j: i64 = 0; j < BOARD_WIDTH; j = j + 1) {
       let neighbors : i64 = 0;
       neighbors = get_neighbors(old_board, i, j, BOARD_WIDTH, BOARD_HEIGHT);
 
@@ -68,22 +56,15 @@ proc gen_board(old_board: *[i64; 21], new_board: *[i64; 21], BOARD_WIDTH: i64, B
       else
         new_val = 0;
       new_board[i][j] = new_val;
-
-      j = j + 1;
     }
-    i = i + 1;
   }
 }
 
 proc copy_board(old_board: *[i64; 21], new_board: *[i64; 21], BOARD_WIDTH: i64, BOARD_HEIGHT: i64) -> () {
-  let i: i64 = 0;
-  while (i < BOARD_HEIGHT) {
-    let j: i64 = 0;
-    while (j < BOARD_WIDTH) {
+  for (let i: i64 = 0; i < BOARD_HEIGHT; i = i + 1) {
+    for (let j: i64 = 0;j < BOARD_WIDTH; j = j + 1) {
       new_board[i][j] = old_board[i][j];
-      j = j + 1;
     }
-    i = i + 1;
   }
 }
 
@@ -95,21 +76,15 @@ proc main() -> () {
   let BOARD_HEIGHT : i64 = 10;
   let board: [[i64; 21]; 10] = 0;
   let new_board: [[i64; 21]; 10] = 0;
-  let i : i64 = 0;
-  let j : i64 = 0;
-  while (i < BOARD_HEIGHT) {
-    j = 0;
-    while (j < BOARD_WIDTH) {
+  
+  for (let i : i64 = 0; i < BOARD_HEIGHT; i = i + 1) {
+    for (let j : i64 = 0; j < BOARD_WIDTH; j = j + 1) {
       board[i][j] = 0;
-      j = j + 1;
     }
-    i = i + 1;
   }
 
-  i = 0;
-  while (i < BOARD_WIDTH / 7) {
-    j = 0;
-    while (j < BOARD_HEIGHT / 5) {
+  for (let i : i64 = 0; i < BOARD_WIDTH / 7; i = i + 1) {
+    for (let j : i64 = 0; j < BOARD_HEIGHT / 5; j = j + 1) {
       let x: i64 = i * 7;
       let y: i64 = j * 5;
       board[0 + y][1 + x] = 1;
@@ -117,31 +92,15 @@ proc main() -> () {
       board[2 + y][0 + x] = 1;
       board[2 + y][1 + x] = 1;
       board[2 + y][2 + x] = 1;
-      j = j + 1;
     }
-    i = i + 1;
   }
 
   let z : i64 = 1;
-
-  i = 0;
-  j = 0;
 
   print_board(board, BOARD_WIDTH, BOARD_HEIGHT);
 
   while (z > 0) {
     gen_board(board, new_board, BOARD_WIDTH, BOARD_HEIGHT);
-
-    i = 0;
-    j = 0;
-    while (i < BOARD_HEIGHT) {
-      j = 0;
-      while (j < BOARD_WIDTH) {
-        board[i][j] = new_board[i][j];
-        j = j + 1;
-      }
-      i = i + 1;
-    }
 
     copy_board(new_board, board, BOARD_WIDTH, BOARD_HEIGHT);
 
@@ -149,7 +108,6 @@ proc main() -> () {
 
     print_board(board, BOARD_WIDTH, BOARD_HEIGHT);
 
-    z = z + 1;
     sleep_for(100000);
     if (getch() == 113) z = 0-1;
   }

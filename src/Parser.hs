@@ -12,6 +12,13 @@ import Text.Printf
 import qualified Data.HashMap as Map
 import Control.Applicative
 
+preprocess :: String -> String
+preprocess = id . uncomment
+
+-- hashdefines :: String -> String
+-- hashdefines [] = []
+-- hashdefines a = undefined
+
 uncomment :: String -> String
 uncomment [] = []
 uncomment input@(_:[]) = input
@@ -24,16 +31,10 @@ data Type =
   Type_String |
   Type_Bool |
   Type_Pointer Type |
-  Type_Arr Type Int |
+  Type_Arr Type Expression |
   Type_Func [Type] Type |
   Type_Empty
   deriving (Eq, Show)
-
-sizeof :: Type -> Int
-sizeof (Type_I64) = 8
-sizeof (Type_I8) = 1
-sizeof (Type_Pointer _) = 8
-sizeof (Type_Arr subtype len) = len * (sizeof subtype)
 
 data Eq i => Error i
   = EndOfInput  -- Expected more input, but there is nothing
@@ -177,6 +178,7 @@ data Expression =
   Exp_Or Expression Expression |
   Exp_Assignment Expression Expression |
   Exp_Declaration String Type Expression |
+  Exp_ConstDeclaration String Type Expression |
   Exp_ArrIndex Expression Expression |
   Exp_Return Expression |
   Exp_Int Int |
@@ -412,7 +414,16 @@ typeP =
   (const Type_I64 <$> stringP "i64") <|> 
   (const Type_I8 <$> stringP "i8") <|> 
   (const Type_Empty <$> stringP "()") <|>
-  (Type_Arr <$> (wcharP '[' *> typeP) <*> (wcharP ';' *> (integerP) <* wcharP ']')) 
+  (Type_Arr <$> (wcharP '[' *> typeP) <*> (wcharP ';' *> (expressionP) <* wcharP ']'))
+
+constP :: Parser Char Expression
+constP = do
+  wss $ stringP "const "
+  varname <- wordP
+  wcharP ':'
+  t <- typeP
+  rhs <- wcharP '=' *> expressionP
+  return $ Exp_ConstDeclaration varname t rhs
 
 declarationP :: Parser Char Expression
 declarationP = do
@@ -422,7 +433,7 @@ declarationP = do
   t <- typeP
   rhs <- wcharP '=' *> expressionP
   return $ Exp_Declaration varname t rhs
- 
+
 data OperatorLevel =
   BinaryOperatorList [(String, Expression -> Expression -> Expression)] |
   PrefixUnaryOperatorList [(String, Expression -> Expression)] |
@@ -463,7 +474,7 @@ parseFinal = numP <|> (Exp_String <$> wordP) <|> parensP <|> stringLiteralP <|> 
 sourceFileParser :: Parser Char [Expression]
 sourceFileParser = do
   (wss $ eofP []) <|> do
-    cur <- procP <|> declarationP
+    cur <- procP <|> (constP <* wcharP ';')
     next <- sourceFileParser
     return (cur:next)
 

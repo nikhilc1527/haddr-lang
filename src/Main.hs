@@ -43,8 +43,8 @@ src_to_asm input_str =
   instructions_printed ++
   start_proc
   where
-    uncommented = uncomment $ input_str
-    input = Input uncommented 0
+    preprocessed = preprocess $ input_str
+    input = Input preprocessed 0
     parsed_either = sourceFileParser.run input
     parsed = either (\err -> error $ show_err err input_str) (fst) $ parsed_either
     (instructions, bss, procs) = sourceCompiler parsed

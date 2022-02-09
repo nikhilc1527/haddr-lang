@@ -17,6 +17,19 @@ import qualified Debug.Trace as Trace
 register_list :: [String]
 register_list = ["rdi", "rsi", "rcx", "rdx", "r8", "r9"]
 
+sizeof :: Type -> Compiler Int
+sizeof (Type_I64) = return 8
+sizeof (Type_I8) = return 1
+sizeof (Type_Pointer _) = return 8
+sizeof (Type_Arr subtype len) = do
+  subsize <- (sizeof subtype)
+  lensize <- eval_constexpr len
+  let lensize_int = case lensize of
+                      (Exp_Int i) -> i
+                      e -> error $ "cannot take size of " ++ (show e)
+  return $ lensize_int * subsize
+sizeof e = error $ "cannot take size of type " ++ (show e)
+
 data Operand = Register String | Addr String | ProcName String | Literal Int deriving (Show, Eq)
 
 rax = Register "rax"
@@ -65,7 +78,9 @@ data CompilerState = CompilerState {
     instructions :: [Instruction],
     bss :: [(String, String)],
     cur_block :: Int,
-    procs :: Set.Set String
+    procs :: Set.Set String,
+    modul :: Map.Map String Symbol,
+    constexprs :: Map.Map String (Type, Expression)
   } deriving (Eq)
 
 initialSymtab :: Map.Map String Symbol
@@ -85,7 +100,7 @@ initialSymtab = Map.fromList
   ]
 
 initialCompilerState :: CompilerState
-initialCompilerState = CompilerState 0 initialSymtab 0 [] [] 0 (Set.fromList ["flush_out"])
+initialCompilerState = CompilerState 0 initialSymtab 0 [] [] 0 (Set.fromList ["flush_out"]) Map.empty Map.empty
 
 newtype Compiler a = Compiler { run :: (CompilerState) -> (CompilerState, a) }
 
@@ -118,6 +133,18 @@ get_counter = Compiler $ \state -> (state, state.counter)
 
 put_state :: CompilerState -> Compiler ()
 put_state new_state = Compiler $ const (new_state, ())
+
+add_to_modul :: Symbol -> Compiler ()
+add_to_modul sym@(Sym_Function name params rettype) = Compiler $ \state -> (state { modul = Map.insert name sym state.modul }, ())
+
+put_contexpr :: String -> Type -> Expression -> Compiler ()
+put_contexpr name typename expr = Compiler $ \state -> (state { constexprs = Map.insert name (typename, expr) state.constexprs }, ())
+
+modify_constexpr :: String -> Type -> Expression -> Compiler ()
+modify_constexpr name typename expr = Compiler $ \state -> (state { constexprs = Map.insert name (typename, expr) $ Map.delete name state.constexprs }, ())
+
+get_constexpr :: String -> Compiler (Maybe (Type, Expression))
+get_constexpr name = Compiler $ \state -> (state, Map.lookup name state.constexprs)
 
 modify_state :: (CompilerState -> CompilerState) -> Compiler ()
 modify_state f = Compiler $ \state -> (f state, ())
@@ -182,6 +209,43 @@ type_can_be (Type_I8) (Type_I64) = True
 type_can_be (Type_I64) (Type_I8) = True
 type_can_be t1 t2 = t1 == t2
 
+canonicalize_type :: Type -> Compiler Type
+canonicalize_type (Type_Arr subtype len) = do
+  subcanon <- canonicalize_type subtype
+  lenexp <- eval_constexpr len
+  return $ Type_Arr subcanon lenexp
+canonicalize_type (Type_Pointer subtype) = (canonicalize_type subtype) >>= (\t -> return $ Type_Pointer t)
+canonicalize_type a = return a
+
+eval_constexpr :: Expression -> Compiler Expression
+eval_constexpr e@(Exp_Int i) = return e
+eval_constexpr (Exp_Plus e1 e2) = do
+  exp1 <- eval_constexpr e1
+  let exp1_int = case exp1 of
+                   (Exp_Int i) -> i
+                   e -> error $ "cannot evaluate " ++ (show e) ++ " in a constant expression"
+  exp2 <- eval_constexpr e2
+  let exp2_int = case exp2 of
+                   (Exp_Int i) -> i
+                   e -> error $ "cannot evaluate " ++ (show e) ++ " in a constant expression"
+  return $ Exp_Int $ exp1_int + exp2_int
+eval_constexpr (Exp_Mult e1 e2) = do
+  exp1 <- eval_constexpr e1
+  let exp1_int = case exp1 of
+                   (Exp_Int i) -> i
+                   e -> error $ "cannot evaluate " ++ (show e) ++ " in a constant expression"
+  exp2 <- eval_constexpr e2
+  let exp2_int = case exp2 of
+                   (Exp_Int i) -> i
+                   e -> error $ "cannot evaluate " ++ (show e) ++ " in a constant expression"
+  return $ Exp_Int $ exp1_int * exp2_int
+eval_constexpr (Exp_String s) = do
+  val <- get_constexpr s
+  case val of
+    Just (typename, value) -> return value
+    Nothing -> error $ "variable " ++ s ++ " is not a constant expression"
+eval_constexpr e = error $ "cannot evaluate expression \n" ++ (print_exp 0 e) ++ "in a compile time context"
+
 compile_lvalue :: Expression -> Compiler Type
 compile_lvalue (Exp_String varname) = do
   state <- get_state
@@ -193,15 +257,16 @@ compile_lvalue (Exp_String varname) = do
           Sub rax (Literal $ pos)
         ]
       return $ typename
-    (Nothing) -> error $ "variable " ++ varname ++ " does not exist"
+    (Nothing) -> error $ "variable " ++ varname ++ " does not exist as lvalue"
 compile_lvalue arrindexexp@(Exp_ArrIndex lvalue index) = do
   lvalue_type <- compile_lvalue lvalue
   case lvalue_type of
     Type_Arr subtype sublen -> do
       put_instr $ Push $ rax
       index_val <- compile index
+      subsize <- sizeof subtype
       put_instrs $
-        [ Mov rbx (Literal $ sizeof subtype),
+        [ Mov rbx (Literal $ subsize),
           Mul rbx,
           Mov rbx rax,
           Pop $ rax,
@@ -209,11 +274,12 @@ compile_lvalue arrindexexp@(Exp_ArrIndex lvalue index) = do
         ]
       return $ subtype
     Type_Pointer subtype -> do
+      subsize <- sizeof subtype
       put_instr $ Mov rax (Addr "QWORD [rax]")
       put_instr $ Push $ rax
       index_val <- compile index
       put_instrs $
-        [ Mov rbx (Literal $ sizeof subtype),
+        [ Mov rbx (Literal $ subsize),
           Mul rbx,
           Mov rbx rax,
           Pop rax,
@@ -257,7 +323,15 @@ compile (Exp_String varname) = do
       Compiler $ \state -> (state { procs = Set.insert name state.procs }, ())
       return $ Type_Func params res
     (Just bla) -> error $ "unhandled: " ++ (show bla)
-    (Nothing) -> error $ "variable " ++ varname ++ " does not exist"
+    (Nothing) -> do
+      constexpr <- get_constexpr varname
+      case constexpr of
+        Just (typename, value) -> 
+          case value of
+            (Exp_Int i) -> do
+              put_instr $ Mov rax $ Literal i
+              return typename
+        Nothing -> error $ "variable " ++ varname ++ " does not exist as rvalue"
 compile arrindex@(Exp_ArrIndex arr index) = do
   lvalue_type <- compile_lvalue arrindex
   case lvalue_type of
@@ -344,7 +418,8 @@ compile (Exp_Assignment left_exp right_exp) = do
   rhs <- compile right_exp
   put_instr $ Mov rbx rax
   put_instr $ Pop $ rax
-  case sizeof lhs of
+  lhssize <- sizeof lhs
+  case lhssize of
     1 -> put_instr $ Mov (Addr $ "BYTE [rax]") (Register "bl")
     8 -> put_instr $ Mov (Addr $ "QWORD [rax]") rbx
   put_instr EmptyLine
@@ -497,7 +572,8 @@ compile (Exp_While cond_exp body_exp) = do
 
 compile (Exp_For init_exp cond_exp final_exp (Exp_SourceBlock body_exps)) = compile (Exp_SourceBlock [init_exp, (Exp_While cond_exp $ Exp_SourceBlock $ body_exps ++ [final_exp])])
 
-compile (Exp_Declaration varname typename rhs_exp) = do
+compile (Exp_Declaration varname typename_uncanon rhs_exp) = do
+  typename <- canonicalize_type typename_uncanon
   symtab <- (.symtab) <$> get_state
   let var = Map.lookup varname symtab
   case var of
@@ -522,11 +598,15 @@ compile (Exp_Declaration varname typename rhs_exp) = do
           put_state $ state { symtab = Map.insert varname (Sym_Variable pos typename) state.symtab, rsp = pos }
           compile rhs_exp
           put_instrs $ [ Sub rsp $ Literal 1, Mov (Addr $ "BYTE [rsp]") al ]
-        (Type_Arr subtype length) -> do
+        (Type_Arr subtype constexpr_length) -> do
+          length_val <- eval_constexpr constexpr_length
+          let length = case length_val of
+                         (Exp_Int a) -> a
+                         e -> error $ "unreachable"
           state <- get_state
-          let subsize = sizeof subtype
+          subsize <- sizeof subtype
           let arr_size = subsize * length
-          put_state $ state { rsp = state.rsp + arr_size, symtab = Map.insert varname (Sym_Variable (state.rsp + arr_size) typename) state.symtab }
+          put_state $ state { rsp = state.rsp + arr_size, symtab = Map.insert varname (Sym_Variable (state.rsp + arr_size) (Type_Arr subtype (Exp_Int subsize))) state.symtab }
           put_instrs $ [ Sub rsp (Literal $ length * subsize) ]
       return Type_Empty
 
@@ -546,7 +626,7 @@ compile (Exp_Proc (Exp_String name) args body rettype) = do
       push_args :: [(String, Type)] -> [Operand] -> Compiler ()
       push_args [] [] = return ()
       push_args ((arg_name, typename):args) (reg:regs) = do
-        let size = sizeof typename
+        size <- sizeof typename
         modify_state $ \st -> st { rsp = st.rsp + size, symtab = Map.insert arg_name (Sym_Variable (st.rsp + size) typename) st.symtab }
         put_instr $ Push reg
         push_args args regs
@@ -599,7 +679,7 @@ compile (Exp_SourceBlock exprs) = do
   return Type_Empty
     where
       compile_exprs :: [Expression] -> Compiler ()
-      compile_exprs = foldr ((>>) . (>> put_instr EmptyLine) . compile) (pure ())
+      compile_exprs = foldr ((>>) . (>> put_instr EmptyLine) . compile) $ pure ()
 
 compile (Exp_Empty) = return Type_Empty
 
@@ -610,9 +690,17 @@ sourceCompiler exprs = (compile_final_state.instructions, compile_final_state.bs
   where
     compiled = compile_all exprs
     compile_all :: [Expression] -> Compiler ()
-    compile_all (e:es) = do
+    compile_all = foldr (\ e c -> compile_one e >> c) $ pure ()
+
+    compile_one :: Expression -> Compiler ()
+    compile_one (Exp_ConstDeclaration name typename val) = do
+      put_contexpr name typename val
+      return ()
+    compile_one e@(Exp_Proc (Exp_String name) args body rettype) = do
+      let functype = Sym_Function name (map snd args) rettype
+      add_to_modul functype
       compile e
-      compile_all es
-    compile_all [] = return ()
+      return ()
+    compile_one e = error $ "impossible expression in top level: " ++ (show e)
     
     compile_final_state = fst $ compiled.run initialCompilerState

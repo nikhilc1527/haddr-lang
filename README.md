@@ -42,10 +42,11 @@ If you see some problems, please don't hesitate to submit a pull request!
 - [ ] modules
 - [ ] parse c header file to make pseudo-module for c ffi
 - [ ] implicit currying functions
-- [ ] separate type checking into its own step
+- [ ] separate type checking into its own step (and make errors have source code row/column labels)
 - [ ] type inference
 - [ ] find mechanism to do RAII (destructors / defer)
 - [ ] use block ([reference](https://youtu.be/QM1iUe6IofM?t=2502))
+- [ ] static reflection
 
 ### Super Long Term
 - [ ] lsp

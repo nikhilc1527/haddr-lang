@@ -649,8 +649,10 @@ compile proccallexp@(Exp_ProcCall procname args) = do
       process_args [] [] = return ()
       process_args s [] = error $ "extra parameters in proc call: " ++ (show s)
       process_args [] s = error $ "not enough parameters in proc call: " ++ (show s)
-      process_args (exp:exprs) (paramtype:params) = do
-        curparamtype <- compile exp
+      process_args (exp:exprs) (paramtype_uncanon:params) = do
+        paramtype <- canonicalize_type paramtype_uncanon
+        curparamtype_uncanon <- compile exp
+        curparamtype <- canonicalize_type curparamtype_uncanon
         if (curparamtype `type_can_be` paramtype) then (return ()) else error $ ("wrong paramter type: expected " ++ (show paramtype) ++ " but got " ++ (show curparamtype) ++ " in: \n" ++ (print_exp 0 proccallexp))
         modify_state $ (\st -> st { rsp = st.rsp + 8 })
         put_instr $ Push $ rax

@@ -14,7 +14,7 @@ If you see some problems, please don't hesitate to submit a pull request!
 - [ ] update the readme
 - [ ] make proper grammar specification
 - [x] string/char literals
-- [ ] type check proc call
+- [x] type check proc call
 - [ ] add type for function pointer
 - [ ] import statement (copy paste style)
 - [ ] lambdas (not closures)
@@ -24,7 +24,7 @@ If you see some problems, please don't hesitate to submit a pull request!
 - [ ] different sized int/uint types
 - [ ] make if statements/blocks into expressions
 - [ ] global variables in (bss)
-- [ ] compile time constants, arrays initialized to size of compile time constant
+- [x] compile time constants, arrays initialized to size of compile time constant
 - [ ] graphviz of control flow
 - [ ] profiling
 - [ ] ++, --, & (address of), * (dereference), +=, -= operators

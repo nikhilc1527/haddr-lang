@@ -1,8 +1,0 @@
-L0 -> if <L0> do <L0> else <L0> end | while <L0> do <L0> end | <VAL> = <L0> | <L1>
-L1 -> <L2> {+|- <L2>}
-L2 -> <L3> {*|/ <L3>}
-L3 -> <ID> | <NUM> | (<L1>)
-VAL -> ID {ID}
-ID -> userdef
-NUM -> num
-STRING -> "<text>"

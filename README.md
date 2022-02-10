@@ -27,10 +27,11 @@ If you see some problems, please don't hesitate to submit a pull request!
 - [x] compile time constants, arrays initialized to size of compile time constant
 - [ ] graphviz of control flow
 - [ ] profiling
-- [ ] ++, --, & (address of), * (dereference), +=, -= operators
+- [ ] ++, --, & (address of), * (dereference), +=, -=, bitwise operators
 - [ ] add emacs/vim support
 - [ ] type check return statements
 - [ ] do nothing if statement doesnt do anything
+- [ ] inline asm
 
 ### Long Term
 - [ ] generics (with typeclasses / type constraints)

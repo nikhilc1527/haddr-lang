@@ -53,4 +53,4 @@ If you see some problems, please don't hesitate to submit a pull request!
 - [ ] lsp
 - [ ] monads
 - [ ] self hosting
-- [ ] asm optimizations (using linear IR)
+- [ ] asm optimizations (using linear IR) -- maybe use llvm but preferrably not idk yet

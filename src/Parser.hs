@@ -190,6 +190,9 @@ data Expression =
   Exp_INVALID
   deriving (Eq, Show)
 
+data ExpressionWithPos =
+  ExpressionWithPos { exp :: Expression, pos :: Int }
+
 -- instance Show Expression where
 --   show = print_exp 0
 
@@ -269,7 +272,7 @@ notReallyP i = Parser $ \input ->
           | True -> Left $ Expected i [f] input.pos
     [] -> Left EndOfInput
 
-operatorLevelP :: (Parser Char Expression) -> OperatorLevel -> (Parser Char Expression)
+operatorLevelP :: (Parser Char ExpressionWithPos) -> OperatorLevel -> (Parser Char ExpressionWithPos)
 -- array subscript and procedure call
 operatorLevelP next_op (FixedLevel 1) = do
   next <- next_op
@@ -292,7 +295,7 @@ operatorLevelP next_op (FixedLevel 1) = do
       wcharP ')'
       return $ (flip Exp_ProcCall) params
         where
-          commas_to_list :: Expression -> [Expression]
+          commas_to_list :: ExpressionWithPos -> [ExpressionWithPos]
           commas_to_list (Exp_Comma e1 e2) = ((commas_to_list e1) ++ [e2])
           commas_to_list e = [e]
 
@@ -309,7 +312,7 @@ operatorLevelP next_op bs@(BinaryOperatorList ops) = do
         return ((operator, operand):nexts)
 operatorLevelP _ _ = error "unreachable"
 
-sepParserBy :: Parser Char Expression -> Parser Char a -> Parser Char b -> Parser Char [Expression]
+sepParserBy :: Parser Char ExpressionWithPos -> Parser Char a -> Parser Char b -> Parser Char [ExpressionWithPos]
 sepParserBy parser separator finisher = do
   first <- parser
   rest <- exprs <|> (const [] <$> finisher)
@@ -321,7 +324,7 @@ sepParserBy parser separator finisher = do
       rest <- exprs <|> (const [] <$> finisher)
       return $ (expr:rest)  
 
-ifP :: Parser Char Expression
+ifP :: Parser Char ExpressionWithPos
 ifP = do
   wss $ stringP "if"
   wcharP '('
@@ -336,7 +339,7 @@ ifP = do
         inside <- parseBlock <|> statementP
         return inside
 
-whileP :: Parser Char Expression
+whileP :: Parser Char ExpressionWithPos
 whileP = do
   wss $ stringP "while"
   wcharP '('
@@ -345,7 +348,7 @@ whileP = do
   body <- parseBlock <|> statementP
   return $ Exp_While cond body
 
-forP :: Parser Char Expression
+forP :: Parser Char ExpressionWithPos
 forP = do
   wss $ stringP "for"
   wcharP '('
@@ -358,7 +361,7 @@ forP = do
   body <- parseBlock <|> statementP
   return $ Exp_For init cond final body
 
-procP :: Parser Char Expression
+procP :: Parser Char ExpressionWithPos
 procP = do
   ws *> stringP "proc "
   func_name <- wss $ (Exp_String <$> wordP)
@@ -380,7 +383,7 @@ procP = do
         typename <- typeP
         nexts <- (wcharP ',' *> argsP) <|> nop []
         return $ (name, typename):nexts
-      commas_to_list :: Expression -> [Expression]
+      commas_to_list :: ExpressionWithPos -> [ExpressionWithPos]
       commas_to_list (Exp_Comma e1 e2) = ((commas_to_list e1) ++ [e2])
       commas_to_list e = [e]
 
@@ -388,7 +391,7 @@ procP = do
 -- commentP = do
   
 
-parseBlock :: Parser Char Expression
+parseBlock :: Parser Char ExpressionWithPos
 parseBlock = Exp_SourceBlock <$> (wcharP '{' *> block)
     where
       block = do
@@ -396,16 +399,16 @@ parseBlock = Exp_SourceBlock <$> (wcharP '{' *> block)
         rest <- block <|> (const [] <$> (wcharP '}'))
         return $ (cur:rest)
 
-statementP :: Parser Char Expression
+statementP :: Parser Char ExpressionWithPos
 statementP = controlStructureP <|> ((declarationP <|> returnExpP <|> expressionP) <* (wcharP ';'))
 
-returnExpP :: Parser Char Expression
+returnExpP :: Parser Char ExpressionWithPos
 returnExpP = do
   stringP "return "
   exp <- expressionP
   return $ Exp_Return $ exp
 
-controlStructureP :: Parser Char Expression
+controlStructureP :: Parser Char ExpressionWithPos
 controlStructureP = ifP <|> whileP <|> forP
 
 typeP :: Parser Char Type
@@ -416,7 +419,7 @@ typeP =
   (const Type_Empty <$> stringP "()") <|>
   (Type_Arr <$> (wcharP '[' *> typeP) <*> (wcharP ';' *> (expressionP) <* wcharP ']'))
 
-constP :: Parser Char Expression
+constP :: Parser Char ExpressionWithPos
 constP = do
   wss $ stringP "const "
   varname <- wordP
@@ -425,7 +428,7 @@ constP = do
   rhs <- wcharP '=' *> expressionP
   return $ Exp_ConstDeclaration varname t rhs
 
-declarationP :: Parser Char Expression
+declarationP :: Parser Char ExpressionWithPos
 declarationP = do
   wss $ stringP "let "
   varname <- wordP
@@ -435,16 +438,16 @@ declarationP = do
   return $ Exp_Declaration varname t rhs
 
 data OperatorLevel =
-  BinaryOperatorList [(String, Expression -> Expression -> Expression)] |
-  PrefixUnaryOperatorList [(String, Expression -> Expression)] |
-  PostfixUnaryOperatorList [(String, Expression -> Expression)] |
+  BinaryOperatorList [(String, ExpressionWithPos -> ExpressionWithPos -> ExpressionWithPos)] |
+  PrefixUnaryOperatorList [(String, ExpressionWithPos -> ExpressionWithPos)] |
+  PostfixUnaryOperatorList [(String, ExpressionWithPos -> ExpressionWithPos)] |
   FixedLevel Int
 
 instance Show OperatorLevel where
   show (FixedLevel i) = show i
   show (BinaryOperatorList bs) = show $ map fst bs
 
-expressionP :: Parser Char Expression
+expressionP :: Parser Char ExpressionWithPos
 expressionP = head operators
     where
       operators_raw = [
@@ -459,10 +462,10 @@ expressionP = head operators
         FixedLevel 1
         -- highest precedence
         ]
-      operators :: [Parser Char Expression]
+      operators :: [Parser Char ExpressionWithPos]
       operators = foldr (\ ops_list new_ops -> let op = operatorLevelP (head new_ops) ops_list in (op:new_ops)) [parseFinal] operators_raw
 
-parseFinal :: Parser Char Expression
+parseFinal :: Parser Char ExpressionWithPos
 parseFinal = numP <|> (Exp_String <$> wordP) <|> parensP <|> stringLiteralP <|> charLiteralP
   where
     parensP = do
@@ -471,14 +474,14 @@ parseFinal = numP <|> (Exp_String <$> wordP) <|> parensP <|> stringLiteralP <|> 
       wcharP ')'
       return exp
 
-sourceFileParser :: Parser Char [Expression]
+sourceFileParser :: Parser Char [ExpressionWithPos]
 sourceFileParser = do
   (wss $ eofP []) <|> do
     cur <- procP <|> (constP <* wcharP ';')
     next <- sourceFileParser
     return (cur:next)
 
-runParser :: Parser Char Expression -> String -> IO ()
+runParser :: Parser Char ExpressionWithPos -> String -> IO ()
 runParser parser input = putStrLn $ case parser.run $ Input input 0 of
                            Right (exp, rest) -> ((print_exp 0 exp) ++ "\nrest:\n" ++ (show rest))
                            Left err -> show err

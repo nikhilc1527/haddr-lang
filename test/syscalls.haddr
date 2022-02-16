@@ -1,0 +1,24 @@
+const stdout_fd: i64 = 1;
+const SYS_write: i64 = 1;
+
+proc my_strlen(in_string: *i8) -> i64 {
+  let cur: *i8 = in_string;
+  let len: i64 = 0;
+
+  while (cur[0] > 0) {
+    len = len + 1;
+    cur = cur + 1;
+  }
+  return len;
+}
+
+proc my_puts(in_string: *i8) -> () {
+  let len: i64 = my_strlen(in_string);
+
+  syscall3(SYS_write, stdout_fd, in_string, len);
+}
+
+proc main() -> () {
+  my_puts("hello world");
+  putch(10);
+}

@@ -33,6 +33,7 @@ data Type =
   Type_Pointer Type |
   Type_Arr Type Expression |
   Type_Func [Type] Type |
+  Type_Any |
   Type_Empty
   deriving (Eq, Show)
 
@@ -253,7 +254,11 @@ ws :: Parser Char String
 ws = Parser $ \input -> Right $ let (a, b) = span isSpace input.str in (a, input {str=b, pos=input.pos + (length a)})
 
 wordP :: Parser Char String
-wordP = spanP (\c -> isAlpha c || c == '_')
+wordP = do
+  word <- spanP (\c -> isAlpha c || c == '_' || isDigit c)
+  if isAlpha $ head word 
+    then return word
+    else Parser $ \s -> Left $ Unexpected (head $ s.str) s.pos
 
 -- white space surround
 wss :: Parser Char a -> Parser Char a

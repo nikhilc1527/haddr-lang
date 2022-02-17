@@ -1,0 +1,16 @@
+import "linux.haddr";
+
+proc strlen(str: *i8) -> i64 {
+  let pointer: *i8 = str;
+  let len: i64 = 0;
+  while (pointer[0] > 0) {
+    pointer = pointer + 1;
+    len = len + 1;
+  }
+  return len;
+}
+
+proc my_puts(str: *i8) -> () {
+  let len: i64 = strlen(str);
+  syscall3(SYS_write, stdout, str, len);
+}

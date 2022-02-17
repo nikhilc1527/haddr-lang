@@ -15,10 +15,6 @@ import Control.Applicative
 preprocess :: String -> String
 preprocess = id . uncomment
 
--- hashdefines :: String -> String
--- hashdefines [] = []
--- hashdefines a = undefined
-
 uncomment :: String -> String
 uncomment [] = []
 uncomment input@(_:[]) = input
@@ -187,12 +183,10 @@ data Expression =
   Exp_String String |
   Exp_StringLiteral String |
   Exp_SourceBlock [Expression] |
+  Exp_Import String |
   Exp_Empty |
   Exp_INVALID
   deriving (Eq, Show)
-
--- instance Show Expression where
---   show = print_exp 0
 
 sp :: Int -> String
 sp = (flip replicate) ' '
@@ -401,6 +395,14 @@ parseBlock = Exp_SourceBlock <$> (wcharP '{' *> block)
         rest <- block <|> (const [] <$> (wcharP '}'))
         return $ (cur:rest)
 
+importP :: Parser Char Expression
+importP = do
+  stringP "import "
+  filename_str <- stringLiteralP
+  let (Exp_StringLiteral filename) = filename_str
+  wcharP ';'
+  return $ Exp_Import $ filename
+
 statementP :: Parser Char Expression
 statementP = controlStructureP <|> ((declarationP <|> returnExpP <|> expressionP) <* (wcharP ';'))
 
@@ -479,7 +481,7 @@ parseFinal = numP <|> (Exp_String <$> wordP) <|> parensP <|> stringLiteralP <|> 
 sourceFileParser :: Parser Char [Expression]
 sourceFileParser = do
   (wss $ eofP []) <|> do
-    cur <- procP <|> (constP <* wcharP ';')
+    cur <- importP <|> procP <|> (constP <* wcharP ';')
     next <- sourceFileParser
     return (cur:next)
 

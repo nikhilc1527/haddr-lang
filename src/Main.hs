@@ -19,47 +19,61 @@ import Control.Concurrent
 import Control.Monad.State
 
 import Parser
-import Compiler   
+import Compiler
 
-parse :: String -> String
-parse str = 
-  let
-    input = Input str 0
-    parsed_either =  sourceFileParser.run input
-    parsed = either (\err -> error $ show_err err str) (fst) $ parsed_either
-  in
-    fold $ map (print_exp 0) parsed
+import Data.List.Split
+
+parse :: FilePath -> String -> IO [Expression]
+parse input_filepath str = do
+  let input = Input str 0
+  let parsed_either =  sourceFileParser.run input
+  let parsed = either (\err -> error $ show_err err str) (fst) $ parsed_either
+  imported <- replace_imports parsed
+  return imported
+    where
+      get_import_filepath :: String -> IO String
+      get_import_filepath import_filepath = do
+        input_abs <- makeAbsolute input_filepath
+        import_filepath <- makeAbsolute $ ((concat $ intersperse "/" $ init $ splitOn "/" input_abs) ++ "/" ++ import_filepath)
+        import_filepath_exists <- doesFileExist import_filepath
+        case import_filepath_exists of
+          True -> return import_filepath
+          False -> error $ "import file " ++ import_filepath ++ " does not exist"
+
+      replace_imports :: [Expression] -> IO [Expression]
+      replace_imports [] = return []
+      replace_imports ((Exp_Import filepath):rest) = do
+        import_filepath <- get_import_filepath filepath
+        file_contents <- readFile import_filepath
+        exprs <- parse import_filepath file_contents
+        rest_imported <- replace_imports rest
+        return $ exprs ++ rest_imported
+      replace_imports (e:rest) = do
+        rest_imported <- replace_imports rest
+        return $ e:rest_imported
 
 bssify :: (String, String) -> String
 bssify (str, name) = name ++ ": db " ++ (concat $ intersperse ", " $ (map (show . ord)) (str ++ "\0")) ++ "\n"
 
-src_to_asm :: String -> String
-src_to_asm input_str = 
-  "global _start\n" ++
-  (fold $ map (\s -> "extern " ++ s ++ "\n") procs) ++
-  "section .data\n" ++
-  (fold $ map bssify bss) ++
-  "section .text\n" ++
-  instructions_printed ++
-  start_proc
-  where
-    preprocessed = preprocess $ input_str
-    input = Input preprocessed 0
-    parsed_either = sourceFileParser.run input
-    parsed = either (\err -> error $ show_err err input_str) (fst) $ parsed_either
-    (instructions, bss, procs) = sourceCompiler parsed
-    instructions_printed = printInstrs instructions
-    start_proc = "_start:\n\tpush rbp\n\tmov rbp, rsp\n\n\tcall main\n\n\tcall flush_out\n\tpop rbp\n\n\tmov rax, 60\n\tmov rdi, 0\n\tsyscall\n"  
+src_to_asm :: FilePath -> String -> IO String
+src_to_asm filepath input_str = do
+  let preprocessed = preprocess $ input_str
+  parsed <- parse filepath preprocessed
+  let (instructions, bss, procs) = sourceCompiler parsed
+  let instructions_printed = printInstrs instructions
+  let start_proc = "_start:\n\tpush rbp\n\tmov rbp, rsp\n\n\tcall main\n\n\tcall flush_out\n\tpop rbp\n\n\tmov rax, 60\n\tmov rdi, 0\n\tsyscall\n"  
+  return $ "global _start\n" ++
+    (fold $ map (\s -> "extern " ++ s ++ "\n") procs) ++
+    "section .data\n" ++
+    (fold $ map bssify bss) ++
+    "section .text\n" ++
+    instructions_printed ++
+    start_proc
 
 dumpASMOfFile :: FilePath -> IO()
 dumpASMOfFile filepath = do
   str <- readFile filepath
-  putStr $ src_to_asm str
-
-parseFile :: FilePath -> IO()
-parseFile filepath = do
-  str <- readFile filepath
-  putStr $ parse str
+  src_to_asm filepath str >>= putStr
 
 runFileForever :: FilePath -> IO ()
 runFileForever filepath = do
@@ -94,7 +108,7 @@ runFile filepath = do
 compileFile :: FilePath -> IO ()
 compileFile filepath = do
   str <- readFile filepath
-  let is = src_to_asm str
+  is <- src_to_asm filepath str
   handle <- openFile "compilation_out/main.asm" WriteMode
   hPutStr handle is
   hFlush handle

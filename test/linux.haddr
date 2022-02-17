@@ -1,0 +1,11 @@
+const SYS_read: i64 = 0;
+const SYS_write: i64 = 1;
+const SYS_open: i64 = 2;
+const SYS_close: i64 = 3;
+const SYS_mmap: i64 = 9;
+const SYS_getpid: i64 = 39;
+
+
+
+const stdin: i64 = 0;
+const stdout: i64 = 1;

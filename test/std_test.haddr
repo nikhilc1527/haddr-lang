@@ -1,0 +1,8 @@
+import "std.haddr";
+
+proc main() -> () {
+  let str: *i8 = "hello world";
+  printi(strlen(str));
+  my_puts(str);
+  putch(10);
+}

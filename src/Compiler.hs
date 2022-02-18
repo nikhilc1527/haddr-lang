@@ -34,10 +34,16 @@ data Operand = Register String | Addr String | ProcName String | Literal Int der
 
 rax = Register "rax"
 rbx = Register "rbx"
+rcx = Register "rcx"
+rdx = Register "rdx"
+r8 = Register "r8"
+r9 = Register "r9"
 al = Register "al"
 bl = Register "bl"
 rbp = Register "rbp"
 rsp = Register "rsp"
+rdi = Register "rdi"
+rsi = Register "rsi"
 
 data Instruction =
   Comment String |
@@ -96,11 +102,31 @@ initialSymtab = Map.fromList
     ("puts", Sym_Function "puts" [Type_Pointer Type_I8] Type_Empty),
     ("sleep_for", Sym_Function "sleep_for" [Type_I64] Type_Empty),
     ("free", Sym_Function "free" [Type_Pointer Type_I64] Type_Empty),
-    ("malloc", Sym_Function "malloc" [Type_I64] (Type_Pointer Type_I64))
+    ("malloc", Sym_Function "malloc" [Type_I64] (Type_Pointer Type_I64)),
+    ("syscall0", Sym_Function "syscall0" [Type_I64] (Type_Empty)),
+    ("syscall1", Sym_Function "syscall1" [Type_I64, Type_Any] (Type_Empty)),
+    ("syscall2", Sym_Function "syscall2" [Type_I64, Type_Any, Type_Any] (Type_Empty)),
+    ("syscall3", Sym_Function "syscall3" [Type_I64, Type_Any, Type_Any, Type_Any] (Type_Empty)),
+    ("syscall4", Sym_Function "syscall4" [Type_I64, Type_Any, Type_Any, Type_Any, Type_Any] (Type_Empty))
   ]
 
+initialInstrs :: [Instruction]
+initialInstrs = concat $ [
+    syscall0_instrs,
+    syscall1_instrs,
+    syscall2_instrs,
+    syscall3_instrs,
+    syscall4_instrs
+  ]
+  where -- rdi, rsi, rcx, rdx, r8, r9
+    syscall0_instrs = [Label "syscall0", Mov rax rdi, Syscall, Ret]
+    syscall1_instrs = [Label "syscall1", Mov rax rdi, Mov rdi rsi, Syscall, Ret]
+    syscall2_instrs = [Label "syscall2", Mov rax rdi, Mov rdi rsi, Mov rsi rcx, Syscall, Ret]
+    syscall3_instrs = [Label "syscall3", Mov rax rdi, Mov rdi rsi, Mov rsi rcx, Mov rcx rdx, Syscall, Ret]
+    syscall4_instrs = [Label "syscall4", Mov rax rdi, Mov rdi rsi, Mov rsi rcx, Mov rcx rdx, Mov rdx r8, Syscall, Ret]
+
 initialCompilerState :: CompilerState
-initialCompilerState = CompilerState 0 initialSymtab 0 [] [] 0 (Set.fromList ["flush_out"]) Map.empty Map.empty
+initialCompilerState = CompilerState 0 initialSymtab 0 initialInstrs [] 0 (Set.fromList ["flush_out"]) Map.empty Map.empty
 
 newtype Compiler a = Compiler { run :: (CompilerState) -> (CompilerState, a) }
 
@@ -197,6 +223,7 @@ printInstrs ((Jlt e1):rest) = "\tjl " ++ e1 ++ "\n" ++ (printInstrs rest)
 printInstrs ((Jle e1):rest) = "\tjle " ++ e1 ++ "\n" ++ (printInstrs rest)
 printInstrs ((Label s):rest) = s ++ ":\n" ++ (printInstrs rest)
 printInstrs ((Ret):rest) = "\tret\n" ++ (printInstrs rest)
+printInstrs ((Syscall):rest) = "\tsyscall\n" ++ (printInstrs rest)
 printInstrs ((Call e1):rest) = "\tcall " ++ (printOperand e1) ++ "\n" ++ (printInstrs rest)
 
 type_equivalent :: Type -> Type -> Bool
@@ -207,6 +234,7 @@ type_can_be (Type_Arr sub1 len) (Type_Pointer sub2) = sub1 `type_can_be` sub2
 type_can_be (Type_Pointer sub1) (Type_I64) = True
 type_can_be (Type_I8) (Type_I64) = True
 type_can_be (Type_I64) (Type_I8) = True
+type_can_be t1 Type_Any = True
 type_can_be t1 t2 = t1 == t2
 
 canonicalize_type :: Type -> Compiler Type

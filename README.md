@@ -16,7 +16,7 @@ If you see some problems, please don't hesitate to submit a pull request!
 - [x] string/char literals
 - [x] type check proc call
 - [ ] add type for function pointer
-- [ ] import statement (copy paste style)
+- [x] import statement (copy paste style)
 - [ ] lambdas (not closures)
 - [ ] static linking (get rid of libc), make list of syscalls, std library
 - [ ] improve ui, add flag to run vs compile (-c, -r), output directory/files

@@ -25,7 +25,7 @@ import Data.List.Split
 
 parse :: FilePath -> String -> IO [Expression]
 parse input_filepath str = do
-  let input = Input str 0
+  let input = Input (preprocess str) 0
   let parsed_either =  sourceFileParser.run input
   let parsed = either (\err -> error $ show_err err str) (fst) $ parsed_either
   imported <- replace_imports parsed
@@ -57,8 +57,7 @@ bssify (str, name) = name ++ ": db " ++ (concat $ intersperse ", " $ (map (show 
 
 src_to_asm :: FilePath -> String -> IO String
 src_to_asm filepath input_str = do
-  let preprocessed = preprocess $ input_str
-  parsed <- parse filepath preprocessed
+  parsed <- parse filepath input_str
   let (instructions, bss, procs) = sourceCompiler parsed
   let instructions_printed = printInstrs instructions
   let start_proc = "_start:\n\tpush rbp\n\tmov rbp, rsp\n\n\tcall main\n\n\tcall flush_out\n\tpop rbp\n\n\tmov rax, 60\n\tmov rdi, 0\n\tsyscall\n"  

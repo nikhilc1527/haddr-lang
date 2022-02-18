@@ -14,3 +14,27 @@ proc my_puts(str: *i8) -> () {
   let len: i64 = strlen(str);
   syscall3(SYS_write, stdout, str, len);
 }
+
+proc my_putch(c: i8) -> () {
+  let tmp: [i8; 1] = 0;
+  tmp[0] = c;
+  syscall3(SYS_write, stdout, tmp, 1);
+  // putch(c);
+}
+
+proc std_printi(num: i64) -> () {
+  if (num == 0) {
+    my_putch('0');
+  } else {
+    if (num < 0) {
+      num = 0 - num;
+      my_putch('-');
+    }
+
+    while (num > 0) {
+      my_putch(num % 10 + '0');
+      num = num / 10;
+    }
+  }
+  my_putch(10);
+}

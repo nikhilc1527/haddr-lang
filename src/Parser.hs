@@ -13,7 +13,7 @@ import qualified Data.HashMap as Map
 import Control.Applicative
 
 preprocess :: String -> String
-preprocess = id . uncomment
+preprocess = uncomment
 
 uncomment :: String -> String
 uncomment [] = []
@@ -173,6 +173,7 @@ data Expression =
   Exp_GreaterThan Expression Expression |
   Exp_And Expression Expression |
   Exp_Or Expression Expression |
+  Exp_AddressOf Expression |
   Exp_Assignment Expression Expression |
   Exp_Declaration String Type Expression |
   Exp_ConstDeclaration String Type Expression |
@@ -267,46 +268,6 @@ notReallyP i = Parser $ \input ->
     (f:r) | f == i -> Right (f, input)
           | True -> Left $ Expected i [f] input.pos
     [] -> Left EndOfInput
-
-operatorLevelP :: (Parser Char Expression) -> OperatorLevel -> (Parser Char Expression)
--- array subscript and procedure call
-operatorLevelP next_op (FixedLevel 1) = do
-  next <- next_op
-  arr_or_calls <- get_arr_or_calls <|> nop []
-  return $ foldl (\lv op -> op lv) next arr_or_calls
--- operatorLevelP next_op (FixedLevel 1) = arrIndexP <|> procCallP <|> next_op
-  where
-    get_arr_or_calls = do
-      cur <- arrIndexP <|> procCallP
-      nexts <- get_arr_or_calls <|> nop []
-      return $ cur:nexts
-    arrIndexP = do
-      wcharP '['
-      value <- expressionP
-      wcharP ']'
-      return $ (flip Exp_ArrIndex) value
-    procCallP = do
-      wcharP '('
-      params <- (commas_to_list <$> expressionP) <|> nop []
-      wcharP ')'
-      return $ (flip Exp_ProcCall) params
-        where
-          commas_to_list :: Expression -> [Expression]
-          commas_to_list (Exp_Comma e1 e2) = ((commas_to_list e1) ++ [e2])
-          commas_to_list e = [e]
-
-operatorLevelP next_op bs@(BinaryOperatorList ops) = do
-  initial <- next_op
-  nexts <- next_parser <|> nop []
-  return $ foldl (\ expr (operator, next_operand) -> operator expr next_operand) initial nexts
-    where
-      operator_func = fold $ map (\(op_str, operator_func) -> const operator_func <$> (wss $ stringP op_str)) ops
-      next_parser = do
-        operator <- operator_func
-        operand <- next_op
-        nexts <- next_parser <|> nop []
-        return ((operator, operand):nexts)
-operatorLevelP _ _ = error "unreachable"
 
 sepParserBy :: Parser Char Expression -> Parser Char a -> Parser Char b -> Parser Char [Expression]
 sepParserBy parser separator finisher = do
@@ -450,6 +411,7 @@ data OperatorLevel =
 instance Show OperatorLevel where
   show (FixedLevel i) = show i
   show (BinaryOperatorList bs) = show $ map fst bs
+  show (PrefixUnaryOperatorList bs) = show $ map fst bs
 
 expressionP :: Parser Char Expression
 expressionP = head operators
@@ -461,6 +423,7 @@ expressionP = head operators
         BinaryOperatorList [("||", Exp_Or)],
         BinaryOperatorList [("&&", Exp_And)],
         BinaryOperatorList [("<=", Exp_LessEqual), (">=", Exp_GreaterEqual), ("<", Exp_LessThan), (">", Exp_GreaterThan), ("==", Exp_Equality)],
+        PrefixUnaryOperatorList [("&", Exp_AddressOf)],
         BinaryOperatorList [("+", Exp_Plus), ("-", Exp_Minus)],
         BinaryOperatorList [("*", Exp_Mult), ("/", Exp_Div), ("%", Exp_Mod)],
         FixedLevel 1
@@ -468,6 +431,49 @@ expressionP = head operators
         ]
       operators :: [Parser Char Expression]
       operators = foldr (\ ops_list new_ops -> let op = operatorLevelP (head new_ops) ops_list in (op:new_ops)) [parseFinal] operators_raw
+
+operatorLevelP :: (Parser Char Expression) -> OperatorLevel -> (Parser Char Expression)
+-- array subscript and procedure call
+operatorLevelP next_op (FixedLevel 1) = do
+  next <- next_op
+  arr_or_calls <- get_arr_or_calls <|> nop []
+  return $ foldl (\lv op -> op lv) next arr_or_calls
+-- operatorLevelP next_op (FixedLevel 1) = arrIndexP <|> procCallP <|> next_op
+  where
+    get_arr_or_calls = do
+      cur <- arrIndexP <|> procCallP
+      nexts <- get_arr_or_calls <|> nop []
+      return $ cur:nexts
+    arrIndexP = do
+      wcharP '['
+      value <- expressionP
+      wcharP ']'
+      return $ (flip Exp_ArrIndex) value
+    procCallP = do
+      wcharP '('
+      params <- (commas_to_list <$> expressionP) <|> nop []
+      wcharP ')'
+      return $ (flip Exp_ProcCall) params
+        where
+          commas_to_list :: Expression -> [Expression]
+          commas_to_list (Exp_Comma e1 e2) = ((commas_to_list e1) ++ [e2])
+          commas_to_list e = [e]
+
+operatorLevelP next_op us@(PrefixUnaryOperatorList ops) = do
+  undefined
+
+operatorLevelP next_op bs@(BinaryOperatorList ops) = do
+  initial <- next_op
+  nexts <- next_parser <|> nop []
+  return $ foldl (\ expr (operator, next_operand) -> operator expr next_operand) initial nexts
+    where
+      operator_func = fold $ map (\(op_str, operator_func) -> const operator_func <$> (wss $ stringP op_str)) ops
+      next_parser = do
+        operator <- operator_func
+        operand <- next_op
+        nexts <- next_parser <|> nop []
+        return ((operator, operand):nexts)
+operatorLevelP _ _ = error "unreachable"
 
 parseFinal :: Parser Char Expression
 parseFinal = numP <|> (Exp_String <$> wordP) <|> parensP <|> stringLiteralP <|> charLiteralP

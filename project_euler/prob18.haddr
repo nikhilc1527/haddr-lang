@@ -1,5 +1,5 @@
-const WIDTH: i64 = 0;
-const HEIGHT: i64 = 0;
+const WIDTH: i64 = 15;
+const HEIGHT: i64 = 15;
 
 proc max(a: i64, b: i64) -> i64 {
   if (a > b) return a;
@@ -23,8 +23,13 @@ proc main() -> () {
 63 66 04 68 89 53 67 30 73 16 69 87 40 31
 04 62 98 27 23 09 70 98 73 93 38 53 60 04 23";
 
+//   let numsstr: *i8 = "03
+// 07 04
+// 02 04 06
+// 08 05 09 03";
+
   let curpointer: *i8 = numsstr;
-  let nums: [[i8; WIDTH]; HEIGHT] = 0;
+  let nums: [[i64; WIDTH]; HEIGHT] = 0;
   for (let i: i8 = 0; i < HEIGHT; i = i + 1) {
     for (let j: i8 = 0; j <= i; j = j + 1) {
       let cur: i64 = (curpointer[0] - '0') * 10 + (curpointer[1] - '0');
@@ -32,17 +37,17 @@ proc main() -> () {
       nums[i][j] = cur;
     }
   }
-  // for (let i: i8 = 0; i < HEIGHT; i = i + 1) {
-  //   for (let j: i8 = 0; j <= i; j = j + 1) {
-  //     puti(nums[i][j]);
-  //     putch(' ');
-  //   }
-  //   putch(10);
-  // }
+  for (let i: i8 = 0; i < HEIGHT; i = i + 1) {
+    for (let j: i8 = 0; j <= i; j = j + 1) {
+      puti(nums[i][j]);
+      putch(' ');
+    }
+    putch(10);
+  }
 
-  let paths: [[i8; 15]; 15] = 0;
+  let paths: [[i64; WIDTH]; HEIGHT] = 0;
   paths[0][0] = nums[0][0];
-  for (let i: i8 = 1; i < 15; i = i + 1) {
+  for (let i: i8 = 1; i < HEIGHT; i = i + 1) {
     paths[i][0] = paths[i-1][0] + nums[i][0];
     paths[i][i] = paths[i-1][i-1] + nums[i][i];
     for (let j: i8 = 1; j < i; j = j + 1) {
@@ -50,9 +55,17 @@ proc main() -> () {
     }
   }
 
+  for (let i: i8 = 0; i < HEIGHT; i = i + 1) {
+    for (let j: i8 = 0; j <= i; j = j + 1) {
+      puti(paths[i][j]);
+      putch(' ');
+    }
+    putch(10);
+  }
+
   let maximum: i64 = 0;
-  for (let i: i64 = 0; i < 15; i = i + 1) {
-    maximum = max(maximum, paths[14][i]);
+  for (let i: i64 = 0; i < WIDTH; i = i + 1) {
+    maximum = max(maximum, paths[HEIGHT-1][i]);
   }
 
   printi(maximum);

@@ -459,8 +459,7 @@ operatorLevelP next_op (FixedLevel 1) = do
           commas_to_list (Exp_Comma e1 e2) = ((commas_to_list e1) ++ [e2])
           commas_to_list e = [e]
 
-operatorLevelP next_op us@(PrefixUnaryOperatorList ops) = do
-  undefined
+operatorLevelP next_op us@(PrefixUnaryOperatorList ops) = undefined
 
 operatorLevelP next_op bs@(BinaryOperatorList ops) = do
   initial <- next_op
@@ -491,7 +490,7 @@ sourceFileParser = do
     next <- sourceFileParser
     return (cur:next)
 
-runParser :: Parser Char Expression -> String -> IO ()
+runParser :: Parser Char Expression-> String -> IO ()
 runParser parser input = putStrLn $ case parser.run $ Input input 0 of
                            Right (exp, rest) -> ((print_exp 0 exp) ++ "\nrest:\n" ++ (show rest))
                            Left err -> show err

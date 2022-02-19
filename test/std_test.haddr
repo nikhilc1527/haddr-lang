@@ -1,6 +1,10 @@
 import "std.haddr";
 
 proc main() -> () {
-  let str: *i8 = "hello world";
+  let str: *i8 = "hello world hehehe";
   std_printi(0-strlen(str));
+
+  for (let i: i64 = 0-100; i <= 100; i = i + 10) {
+    std_printi(i);
+  }
 }

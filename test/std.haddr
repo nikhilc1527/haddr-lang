@@ -16,25 +16,32 @@ proc my_puts(str: *i8) -> () {
 }
 
 proc my_putch(c: i8) -> () {
-  let tmp: [i8; 1] = 0;
-  tmp[0] = c;
-  syscall3(SYS_write, stdout, tmp, 1);
-  // putch(c);
+  syscall3(SYS_write, stdout, &c, 1);
 }
 
 proc std_printi(num: i64) -> () {
   if (num == 0) {
     my_putch('0');
   } else {
+    let num_buffer: [i8; 23] = 0;
+    let i: i64 = 22;
+    let negative: i8 = 0;
     if (num < 0) {
-      num = 0 - num;
-      my_putch('-');
+      negative = 1;
+      num = 0-num;
     }
 
     while (num > 0) {
-      my_putch(num % 10 + '0');
+      num_buffer[i] = num % 10 + '0';
       num = num / 10;
+      i = i - 1;
     }
+    if (negative > 0) {
+      num_buffer[i] = '-';
+      i = i - 1;
+    }
+
+    syscall3(SYS_write, stdout, &(num_buffer[i]), 23 - i);
   }
   my_putch(10);
 }

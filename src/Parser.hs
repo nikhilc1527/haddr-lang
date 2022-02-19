@@ -459,7 +459,10 @@ operatorLevelP next_op (FixedLevel 1) = do
           commas_to_list (Exp_Comma e1 e2) = ((commas_to_list e1) ++ [e2])
           commas_to_list e = [e]
 
-operatorLevelP next_op us@(PrefixUnaryOperatorList ops) = undefined
+operatorLevelP next_op us@(PrefixUnaryOperatorList ops) = (do
+  matched <- foldr (<|>) empty $ map (\(s, e) -> (const e <$> stringP s)) ops
+  next_parse <- operatorLevelP next_op us
+  return $ matched $ next_parse) <|> next_op
 
 operatorLevelP next_op bs@(BinaryOperatorList ops) = do
   initial <- next_op

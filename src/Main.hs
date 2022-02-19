@@ -114,7 +114,7 @@ compileFile filepath = do
   hClose handle
   run_proc "nasm -f elf64 -g main.asm -o main.o"
   run_proc "gcc -c -o util.o util.c"
-  run_proc "ld -o main main.o util.o -lc -dynamic-linker /lib64/ld-linux-x86-64.so.2"
+  run_proc "ld -g -o main main.o util.o -lc -dynamic-linker /lib64/ld-linux-x86-64.so.2"
     where
       run_proc :: String -> IO()
       run_proc cmd = do

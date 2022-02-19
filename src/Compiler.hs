@@ -371,6 +371,7 @@ compile arrindex@(Exp_ArrIndex arr index) = do
       put_instr $ Mov bl (Addr "BYTE [rax]")
       put_instr $ Mov rax rbx
   return lvalue_type
+compile (Exp_AddressOf s) = compile_lvalue s
 compile (Exp_Plus e1 e2) = do
   a <- compile e1
   case e2 of
@@ -650,15 +651,18 @@ compile (Exp_Proc (Exp_String name) args body rettype) = do
   put_instrs $ [ Add rsp (Literal $ 8 * (length args)) ] <> [ Pop rbp, Ret ]
   return Type_Empty
     where
+      args_registers :: [Operand]
       args_registers = take (length args) $ Register <$> register_list
+
       push_args :: [(String, Type)] -> [Operand] -> Compiler ()
       push_args [] [] = return ()
       push_args ((arg_name, typename):args) (reg:regs) = do
         size <- sizeof typename
-        modify_state $ \st -> st { rsp = st.rsp + size, symtab = Map.insert arg_name (Sym_Variable (st.rsp + size) typename) st.symtab }
-        put_instr $ Push reg
+        modify_state $ \st -> st { rsp = st.rsp + 8, symtab = Map.insert arg_name (Sym_Variable (st.rsp + 8) typename) st.symtab }
+        -- put_instr $ Mov (Addr "QWORD [rsp-8]") reg
+        put_instr $ Sub rsp $ Literal 8
+        put_instr $ Mov (Addr "QWORD [rsp]") reg
         push_args args regs
-        return ()
 
 compile proccallexp@(Exp_ProcCall procname args) = do
   functype <- compile procname

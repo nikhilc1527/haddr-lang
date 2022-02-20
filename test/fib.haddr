@@ -1,3 +1,5 @@
+import "std.haddr";
+
 proc main() -> () {
   let i: i64 = 0;
   let j: i64 = 1;

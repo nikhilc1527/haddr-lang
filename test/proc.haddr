@@ -1,15 +1,17 @@
-proc testtwo(a, b, c) -> i64 {
+import "std.haddr";
+
+proc testtwo(a: i64, b: i64, c: i64) -> i64 {
   return a + b + c + 5;
 }
 
-proc test(a, b) -> i64 {
+proc test(a: i64, b: i64) -> i64 {
   return a + b + testtwo(a, b, 3);
 }
 
 proc main() -> () {
-  let i = 0;
+  let i: i64 = 0;
   while (i < 3) {
-    let j = test(1, 2);
+    let j: i64 = test(1, 2);
     printi(j);
     i = i + 1;
   }

@@ -10,18 +10,25 @@ proc strlen(str: *i8) -> i64 {
   return len;
 }
 
-proc my_puts(str: *i8) -> () {
+proc puts(str: *i8) -> () {
   let len: i64 = strlen(str);
   syscall3(SYS_write, stdout, str, len);
+  putch(10);
 }
 
-proc my_putch(c: i8) -> () {
+proc getch() -> i8 {
+  let ch: i8 = 0;
+  syscall3(SYS_read, stdin, &ch, 1);
+  return ch;
+}
+
+proc putch(c: i8) -> () {
   syscall3(SYS_write, stdout, &c, 1);
 }
 
-proc std_printi(num: i64) -> () {
+proc printi(num: i64) -> () {
   if (num == 0) {
-    my_putch('0');
+    putch('0');
   } else {
     let num_buffer: [i8; 23] = 0;
     let i: i64 = 22;
@@ -41,7 +48,40 @@ proc std_printi(num: i64) -> () {
       i = i - 1;
     }
 
-    syscall3(SYS_write, stdout, &(num_buffer[i]), 23 - i);
+    syscall3(SYS_write, stdout, &(num_buffer[i+1]), 23 - i - 1);
   }
-  my_putch(10);
+  putch(10);
+}
+
+proc puti(num: i64) -> () {
+  if (num == 0) {
+    putch('0');
+  } else {
+    let num_buffer: [i8; 23] = 0;
+    let i: i64 = 22;
+    let negative: i8 = 0;
+    if (num < 0) {
+      negative = 1;
+      num = 0-num;
+    }
+
+    while (num > 0) {
+      num_buffer[i] = num % 10 + '0';
+      num = num / 10;
+      i = i - 1;
+    }
+    if (negative > 0) {
+      num_buffer[i] = '-';
+      i = i - 1;
+    }
+
+    syscall3(SYS_write, stdout, &(num_buffer[i+1]), 23 - i - 1);
+  }
+}
+
+proc sleep(seconds: i64, nanoseconds: i64) -> () {
+  let timespec: [i64; 2] = 0;
+  timespec[0] = seconds;
+  timespec[1] = nanoseconds;
+  syscall2(SYS_nanosleep, timespec, 0);
 }

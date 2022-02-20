@@ -19,6 +19,7 @@ register_list = ["rdi", "rsi", "rcx", "rdx", "r8", "r9"]
 
 sizeof :: Type -> Compiler Int
 sizeof (Type_I64) = return 8
+sizeof (Type_I32) = return 4
 sizeof (Type_I8) = return 1
 sizeof (Type_Pointer _) = return 8
 sizeof (Type_Arr subtype len) = do
@@ -40,6 +41,8 @@ r8 = Register "r8"
 r9 = Register "r9"
 al = Register "al"
 bl = Register "bl"
+eax = Register "eax"
+ebx = Register "ebx"
 rbp = Register "rbp"
 rsp = Register "rsp"
 rdi = Register "rdi"
@@ -53,6 +56,7 @@ data Instruction =
   Add Operand Operand |
   Or Operand Operand |
   And Operand Operand |
+  Xor Operand Operand |
   Call Operand |
   Cmp Operand Operand |
   Je String |
@@ -213,6 +217,7 @@ printInstrs ((Sub e1 e2):rest) = "\tsub " ++ (printOperand e1) ++ ", " ++ (print
 printInstrs ((Cmp e1 e2):rest) = "\tcmp " ++ (printOperand e1) ++ ", " ++ (printOperand e2) ++ "\n" ++ (printInstrs rest)
 printInstrs ((And e1 e2):rest) = "\tand " ++ (printOperand e1) ++ ", " ++ (printOperand e2) ++ "\n" ++ (printInstrs rest)
 printInstrs ((Or e1 e2):rest) = "\tor " ++ (printOperand e1) ++ ", " ++ (printOperand e2) ++ "\n" ++ (printInstrs rest)
+printInstrs ((Xor e1 e2):rest) = "\txor " ++ (printOperand e1) ++ ", " ++ (printOperand e2) ++ "\n" ++ (printInstrs rest)
 printInstrs ((Mul e1):rest) = "\tmul " ++ (printOperand e1) ++ "\n" ++ (printInstrs rest)
 printInstrs ((Div e1):rest) = "\tdiv " ++ (printOperand e1) ++ "\n" ++ (printInstrs rest)
 printInstrs ((Push e1):rest) = "\tpush " ++ (printOperand e1) ++ "\n" ++ (printInstrs rest)
@@ -233,7 +238,11 @@ type_can_be :: Type -> Type -> Bool
 type_can_be (Type_Arr sub1 len) (Type_Pointer sub2) = sub1 `type_can_be` sub2
 type_can_be (Type_Pointer sub1) (Type_I64) = True
 type_can_be (Type_I8) (Type_I64) = True
+type_can_be (Type_I8) (Type_I32) = True
+type_can_be (Type_I32) (Type_I8) = True
+type_can_be (Type_I32) (Type_I64) = True
 type_can_be (Type_I64) (Type_I8) = True
+type_can_be (Type_I64) (Type_I32) = True
 type_can_be t1 Type_Any = True
 type_can_be t1 t2 = t1 == t2
 
@@ -338,6 +347,10 @@ compile (Exp_String varname) = do
       put_instrs $
         [Mov rbx $ Literal 0, Mov bl (Addr $ ("BYTE [rbp-" ++ (show pos) ++ "]")), Mov rax rbx]
       return Type_I64
+    (Just (Sym_Variable pos Type_I32)) -> do
+      put_instrs $
+        [Mov rbx $ Literal 0, Mov ebx (Addr $ ("DWORD [rbp-" ++ (show pos) ++ "]")), Mov rax rbx]
+      return Type_I32
     (Just (Sym_Variable pos typename@(Type_Pointer _))) -> do
       put_instrs $
         [Mov rax (Addr $ ("QWORD [rbp-" ++ (show pos) ++ "]"))]
@@ -369,6 +382,10 @@ compile arrindex@(Exp_ArrIndex arr index) = do
     Type_I8 -> do
       put_instr $ Mov rbx $ Literal 0
       put_instr $ Mov bl (Addr "BYTE [rax]")
+      put_instr $ Mov rax rbx
+    Type_I32 -> do
+      put_instr $ Mov rbx $ Literal 0
+      put_instr $ Mov ebx (Addr "DWORD [rax]")
       put_instr $ Mov rax rbx
   return lvalue_type
 compile (Exp_AddressOf s) = compile_lvalue s
@@ -412,7 +429,7 @@ compile (Exp_Mult e1 e2) = do
   a <- compile e1
   put_instr $ Push $ rax
   b <- compile e2
-  if (a == b || (a == Type_I64 && b == Type_I8) || (a == Type_I8 && b == Type_I64)) then return () else error $ "operator (*): wrong arguments of type " ++ (show a) ++ " and " ++ (show b)
+  if ((a `elem` int_types) && (b `elem` int_types) && a `type_can_be` b) then return () else error $ "operator (*): wrong arguments of type " ++ (show a) ++ " and " ++ (show b)
   put_instrs $
     [Pop $ rbx] <>
     [Mul rbx]
@@ -421,7 +438,7 @@ compile (Exp_Div e1 e2) = do
   a <- compile e1
   put_instr $ Push rax
   b <- compile e2
-  if (a == b || (a == Type_I64 && b == Type_I8) || (a == Type_I8 && b == Type_I64)) then return () else error $ "operator (/): wrong arguments of type " ++ (show a) ++ " and " ++ (show b)
+  if ((a `elem` int_types) && (b `elem` int_types) && a `type_can_be` b) then return () else error $ "operator (/): wrong arguments of type " ++ (show a) ++ " and " ++ (show b)
   put_instrs $
     [Mov rbx rax] <>
     [Pop $ rax] <>
@@ -432,7 +449,7 @@ compile (Exp_Mod e1 e2) = do
   a <- compile e1
   put_instr $ Push rax
   b <- compile e2
-  if (a == b || (a == Type_I64 && b == Type_I8) || (a == Type_I8 && b == Type_I64)) then return () else error $ "operator (%): wrong arguments of type " ++ (show a) ++ " and " ++ (show b)
+  if ((a `elem` int_types) && (b `elem` int_types) && a `type_can_be` b) then return () else error $ "operator (%): wrong arguments of type " ++ (show a) ++ " and " ++ (show b)
   put_instrs $
     [Mov rbx rax] <>
     [Pop $ rax] <>
@@ -449,7 +466,8 @@ compile (Exp_Assignment left_exp right_exp) = do
   put_instr $ Pop $ rax
   lhssize <- sizeof lhs
   case lhssize of
-    1 -> put_instr $ Mov (Addr $ "BYTE [rax]") (Register "bl")
+    1 -> put_instr $ Mov (Addr $ "BYTE [rax]") bl
+    4 -> put_instr $ Mov (Addr $ "DWORD [rax]") ebx
     8 -> put_instr $ Mov (Addr $ "QWORD [rax]") rbx
   put_instr EmptyLine
   return Type_Empty
@@ -566,6 +584,31 @@ compile (Exp_Or e1 e2) = do
     [Or rax rbx]
   return Type_Bool
 
+compile (Exp_BitAnd e1 e2) = do
+  a <- compile e1
+  put_instr $ Push $ rax
+  b <- compile e2
+  put_instrs $
+    [Pop $ rbx] <>
+    [And rax rbx]
+  return Type_I64
+compile (Exp_BitOr e1 e2) = do
+  a <- compile e1
+  put_instr $ Push $ rax
+  b <- compile e2
+  put_instrs $
+    [Pop $ rbx] <>
+    [Or rax rbx]
+  return Type_I64
+compile (Exp_BitXor e1 e2) = do
+  a <- compile e1
+  put_instr $ Push $ rax
+  b <- compile e2
+  put_instrs $
+    [Pop $ rbx] <>
+    [Xor rax rbx]
+  return Type_I64
+
 compile (Exp_If cond_exp true_exp false_exp) = do
   increment_counter
   state <- get_state
@@ -627,6 +670,12 @@ compile (Exp_Declaration varname typename_uncanon rhs_exp) = do
           put_state $ state { symtab = Map.insert varname (Sym_Variable pos typename) state.symtab, rsp = pos }
           compile rhs_exp
           put_instrs $ [ Sub rsp $ Literal 1, Mov (Addr $ "BYTE [rsp]") al ]
+        (Type_I32) -> do
+          state <- get_state
+          let pos = state.rsp + 4
+          put_state $ state { symtab = Map.insert varname (Sym_Variable pos typename) state.symtab, rsp = pos }
+          compile rhs_exp
+          put_instrs $ [ Sub rsp $ Literal 4, Mov (Addr $ "DWORD [rsp]") eax ]
         (Type_Arr subtype constexpr_length) -> do
           length_val <- eval_constexpr constexpr_length
           let length = case length_val of

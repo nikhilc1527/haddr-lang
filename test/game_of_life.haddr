@@ -1,5 +1,28 @@
+import "std.haddr";
+
 const BOARD_WIDTH: i64 = 40;
 const BOARD_HEIGHT: i64 = 10;
+
+proc unbuffer_term() -> () {
+  let tio: [i32; 15] = 0;
+
+  // get the terminal settings for stdin
+  syscall3(SYS_ioctl, stdin, TCGETS, tio);
+
+  // disable canonical mode (buffered i/o) and local echo
+  // new_tio.c_lflag &= (~ICANON & ~ECHO);
+  tio[3] = tio[3] & (0-3) & (0-9);
+
+  // set the new settings immediately
+  // tcsetattr(STDIN_FILENO, TCSANOW, &new_tio);
+  syscall3(SYS_ioctl, stdin, TCSETS+0, tio);
+}
+
+proc nonblock() -> () {
+  let fd: i64 = stdin;
+  let flags: i64 = syscall3(SYS_fcntl, fd, F_GETFL, 0);
+  syscall3(SYS_fcntl, fd, F_SETFL, flags | O_NONBLOCK);
+}
 
 proc move_left(n : i64)->() {
   putch(27);
@@ -18,16 +41,17 @@ proc reset_board()->() {
   move_up(BOARD_HEIGHT);
 }
 
-proc print_board(board: *[i64; BOARD_WIDTH]) -> () {
+proc print_board(board: *[i64; BOARD_WIDTH], board_str: *i8) -> () {
   for (let i : i64 = 0; i < BOARD_HEIGHT; i = i + 1) {
     for (let j : i64 = 0; j < BOARD_WIDTH; j = j + 1) {
       if (board[i][j] == 0)
-        putch(46);
+        board_str[i * (BOARD_WIDTH + 1) + j] = '.';
       else
-        putch(35);
+        board_str[i * (BOARD_WIDTH + 1) + j] = '#';
     }
-    putch(10);
+    board_str[i * (BOARD_WIDTH + 1) + BOARD_WIDTH] = 10;
   }
+  syscall3(SYS_write, stdout, board_str, BOARD_HEIGHT * (BOARD_WIDTH + 1));
 }
 
 proc get_neighbors(board: *[i64; BOARD_WIDTH], i: i64, j: i64) -> i64 {
@@ -85,8 +109,9 @@ proc main() -> () {
   unbuffer_term();
   nonblock();
 
-  let board : [[i64; BOARD_WIDTH]; BOARD_HEIGHT] = 0;
-  let new_board : [[i64; BOARD_WIDTH]; BOARD_HEIGHT] = 0;
+  let board: [[i64; BOARD_WIDTH]; BOARD_HEIGHT] = 0;
+  let new_board: [[i64; BOARD_WIDTH]; BOARD_HEIGHT] = 0;
+  let board_str: [i8; (BOARD_WIDTH + 1) * BOARD_HEIGHT] = 0;
 
   for (let i : i64 = 0; i < BOARD_HEIGHT; i = i + 1) {
     for (let j : i64 = 0; j < BOARD_WIDTH; j = j + 1) {
@@ -101,7 +126,7 @@ proc main() -> () {
 
   let z : i64 = 1;
 
-  print_board(board);
+  print_board(board, board_str);
 
   while (z > 0) {
     gen_board(board, new_board);
@@ -110,9 +135,9 @@ proc main() -> () {
 
     reset_board();
 
-    print_board(board);
+    print_board(board, board_str);
 
-    sleep_for(100000);
+    sleep(0, 100000000);
     if (getch() == 113) z = 0 - 1;
   }
 }

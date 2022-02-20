@@ -1,3 +1,5 @@
+import "std.haddr";
+
 proc f_one(a: i64) -> i64 {
      return a + 1;
 }

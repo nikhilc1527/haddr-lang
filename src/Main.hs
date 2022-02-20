@@ -60,7 +60,7 @@ src_to_asm filepath input_str = do
   parsed <- parse filepath input_str
   let (instructions, bss, procs) = sourceCompiler parsed
   let instructions_printed = printInstrs instructions
-  let start_proc = "_start:\n\tpush rbp\n\tmov rbp, rsp\n\n\tcall main\n\n\tcall flush_out\n\tpop rbp\n\n\tmov rax, 60\n\tmov rdi, 0\n\tsyscall\n"  
+  let start_proc = "_start:\n\tpush rbp\n\tmov rbp, rsp\n\n\tcall main\n\n\tpop rbp\n\n\tmov rax, 60\n\tmov rdi, 0\n\tsyscall\n"  
   return $ "global _start\n" ++
     (fold $ map (\s -> "extern " ++ s ++ "\n") procs) ++
     "section .data\n" ++
@@ -72,7 +72,8 @@ src_to_asm filepath input_str = do
 dumpASMOfFile :: FilePath -> IO()
 dumpASMOfFile filepath = do
   str <- readFile filepath
-  src_to_asm filepath str >>= putStr
+  asm_str <- src_to_asm filepath str
+  putStr asm_str
 
 runFileForever :: FilePath -> IO ()
 runFileForever filepath = do
@@ -113,8 +114,8 @@ compileFile filepath = do
   hFlush handle
   hClose handle
   run_proc "nasm -f elf64 -g main.asm -o main.o"
-  run_proc "gcc -c -o util.o util.c"
-  run_proc "ld -g -o main main.o util.o -lc -dynamic-linker /lib64/ld-linux-x86-64.so.2"
+  -- run_proc "ld -g -o main main.o util.o -lc -dynamic-linker /lib64/ld-linux-x86-64.so.2"
+  run_proc "ld -g -o main main.o"
     where
       run_proc :: String -> IO()
       run_proc cmd = do

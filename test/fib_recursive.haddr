@@ -1,6 +1,8 @@
+import "std.haddr";
+
 proc fib(a: i64) -> i64 {
-  if (a < 2) a;
-  else fib(a-2) + fib(a-1);
+  if (a < 2) return a;
+  else return fib(a-2) + fib(a-1);
 }
 
 proc main() -> () {

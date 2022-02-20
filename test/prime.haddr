@@ -1,7 +1,9 @@
+import "std.haddr";
+
 proc isprime(i: i64) -> i64 {
       let res: i64 = 1;
       let j: i64 = 2;
-      while ((j < i) * res) {
+      while (j < i && res) {
             if (i % j == 0) {
                 res = 0;
             }

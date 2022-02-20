@@ -3,9 +3,22 @@ const SYS_write: i64 = 1;
 const SYS_open: i64 = 2;
 const SYS_close: i64 = 3;
 const SYS_mmap: i64 = 9;
+const SYS_ioctl: i64 = 16;
+const SYS_nanosleep: i64 = 35;
 const SYS_getpid: i64 = 39;
+const SYS_fcntl: i64 = 72;
 
 
 
 const stdin: i64 = 0;
 const stdout: i64 = 1;
+
+
+const O_NONBLOCK: i64 = 2048;
+
+const F_GETFL: i64 = 3;
+const F_SETFL: i64 = 4;
+
+const TCGETS: i64 = 21505;
+const TCSETS: i64 = 21506;
+const TCSANOW: i64 = 0;

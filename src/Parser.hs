@@ -23,6 +23,7 @@ uncomment (a:rest) = a:(uncomment rest)
 
 data Type = 
   Type_I64 |
+  Type_I32 |
   Type_I8 |
   Type_String |
   Type_Bool |
@@ -32,6 +33,9 @@ data Type =
   Type_Any |
   Type_Empty
   deriving (Eq, Show)
+
+int_types :: [Type]
+int_types = [Type_I8, Type_I32, Type_I64]
 
 data Eq i => Error i
   = EndOfInput  -- Expected more input, but there is nothing
@@ -164,6 +168,10 @@ data Expression =
   Exp_Minus Expression Expression |
   Exp_Mult Expression Expression |
   Exp_Div Expression Expression |
+  Exp_BitOr Expression Expression |
+  Exp_BitAnd Expression Expression |
+  Exp_BitNot Expression Expression |
+  Exp_BitXor Expression Expression |
   Exp_Mod Expression Expression |
   Exp_Comma Expression Expression |
   Exp_Equality Expression Expression |
@@ -381,6 +389,7 @@ typeP =
   ((wcharP '*') *> (Type_Pointer <$> typeP)) <|>
   (const Type_I64 <$> stringP "i64") <|> 
   (const Type_I8 <$> stringP "i8") <|> 
+  (const Type_I32 <$> stringP "i32") <|> 
   (const Type_Empty <$> stringP "()") <|>
   (Type_Arr <$> (wcharP '[' *> typeP) <*> (wcharP ';' *> (expressionP) <* wcharP ']'))
 
@@ -424,6 +433,9 @@ expressionP = head operators
         BinaryOperatorList [("&&", Exp_And)],
         BinaryOperatorList [("<=", Exp_LessEqual), (">=", Exp_GreaterEqual), ("<", Exp_LessThan), (">", Exp_GreaterThan), ("==", Exp_Equality)],
         PrefixUnaryOperatorList [("&", Exp_AddressOf)],
+        BinaryOperatorList [("|", Exp_BitOr)],
+        BinaryOperatorList [("^", Exp_BitXor)],
+        BinaryOperatorList [("&", Exp_BitAnd)],
         BinaryOperatorList [("+", Exp_Plus), ("-", Exp_Minus)],
         BinaryOperatorList [("*", Exp_Mult), ("/", Exp_Div), ("%", Exp_Mod)],
         FixedLevel 1

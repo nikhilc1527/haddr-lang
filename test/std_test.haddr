@@ -4,6 +4,8 @@ proc main() -> () {
   let str: *i8 = "hello world hehehe";
   std_printi(0-strlen(str));
 
+  sleep(1, 0);
+
   for (let i: i64 = 0-100; i <= 100; i = i + 10) {
     std_printi(i);
   }

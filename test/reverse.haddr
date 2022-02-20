@@ -1,8 +1,10 @@
+import "std.haddr";
+
 proc main() -> () {
-    let i = 12345;
+    let i: i64 = 12345;
     printi(i);
-    let reverse = 0;
-    while (i) {
+    let reverse: i64 = 0;
+    while (i > 0) {
         reverse = reverse * 10;
         reverse = reverse + i % 10;
         i = i / 10;

@@ -1,3 +1,5 @@
+import "std.haddr";
+
 proc main() -> () {
   let arr: [[i64; 5]; 5] = 0;
   let i:i64 = 0;

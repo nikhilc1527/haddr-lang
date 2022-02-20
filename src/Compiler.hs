@@ -307,7 +307,8 @@ compile_lvalue arrindexexp@(Exp_ArrIndex lvalue index) = do
           Mul rbx,
           Mov rbx rax,
           Pop $ rax,
-          Lea rax (Addr $ ("rax [rbx]"))
+          -- Lea rax (Addr $ ("rax [rbx]"))
+          Add rax rbx
         ]
       return $ subtype
     Type_Pointer subtype -> do
@@ -320,7 +321,8 @@ compile_lvalue arrindexexp@(Exp_ArrIndex lvalue index) = do
           Mul rbx,
           Mov rbx rax,
           Pop rax,
-          Lea rax (Addr $ ("rax [rbx]"))
+          -- Lea rax (Addr $ ("rax [rbx]"))
+          Add rax rbx
         ]
       return $ subtype
     o -> error $ "cannot take index of type " ++ (show o) ++ " in expression\n" ++ (print_exp 0 arrindexexp)

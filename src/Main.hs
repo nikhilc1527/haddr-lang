@@ -60,9 +60,9 @@ src_to_asm filepath input_str = do
   parsed <- parse filepath input_str
   let (instructions, bss, procs) = sourceCompiler parsed
   let instructions_printed = printInstrs instructions
-  let start_proc = "_start:\n\tpush rbp\n\tmov rbp, rsp\n\n\tcall main\n\n\tpop rbp\n\n\tmov rax, 60\n\tmov rdi, 0\n\tsyscall\n"  
+  let start_proc = "_start:\n\tpush rbp\n\tmov rbp, rsp\n\n\tlea rdi, [rsp+16]\n\tcall main\n\n\tpop rbp\n\n\tmov rax, 60\n\tmov rdi, 0\n\tsyscall\n"  
   return $ "global _start\n" ++
-    (fold $ map (\s -> "extern " ++ s ++ "\n") procs) ++
+    -- (fold $ map (\s -> "extern " ++ s ++ "\n") procs) ++
     "section .data\n" ++
     (fold $ map bssify bss) ++
     "section .text\n" ++
@@ -113,12 +113,14 @@ compileFile filepath = do
   hPutStr handle is
   hFlush handle
   hClose handle
-  run_proc "nasm -f elf64 -g main.asm -o main.o"
-  -- run_proc "ld -g -o main main.o util.o -lc -dynamic-linker /lib64/ld-linux-x86-64.so.2"
+  run_proc "yasm -g dwarf2 -f elf64 main.asm -o main.o"
+  -- run_proc "ld -g -o main main.o -lc -dynamic-linker /lib64/ld-linux-x86-64.so.2"
   run_proc "ld -g -o main main.o"
     where
       run_proc :: String -> IO()
       run_proc cmd = do
+        putStr "[CMD]: "
+        putStrLn cmd
         let process = (shell cmd) {cwd = Just "compilation_out/"}
         (_, stdout_handle, _, proc_handle) <- createProcess process
         ecode <- waitForProcess proc_handle

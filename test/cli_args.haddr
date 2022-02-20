@@ -1,0 +1,7 @@
+import "std.haddr";
+
+proc main(argv: **i8) -> () {
+  for (let i: i64 = 0; argv[i] > 0; i = i + 1) {
+    puts(argv[i]);
+  }
+}

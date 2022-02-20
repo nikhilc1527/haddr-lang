@@ -13,7 +13,9 @@ const SYS_fcntl: i64 = 72;
 const stdin: i64 = 0;
 const stdout: i64 = 1;
 
-
+const O_RDONLY: i64 = 0;
+const O_WRONLY: i64 = 1;
+const O_RDWR: i64 = 2;
 const O_NONBLOCK: i64 = 2048;
 
 const F_GETFL: i64 = 3;

@@ -13,6 +13,10 @@ proc strlen(str: *i8) -> i64 {
 proc puts(str: *i8) -> () {
   let len: i64 = strlen(str);
   syscall3(SYS_write, stdout, str, len);
+}
+proc prints(str: *i8) -> () {
+  let len: i64 = strlen(str);
+  syscall3(SYS_write, stdout, str, len);
   putch(10);
 }
 

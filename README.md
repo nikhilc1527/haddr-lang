@@ -18,10 +18,10 @@ If you see some problems, please don't hesitate to submit a pull request!
 - [ ] add type for function pointer
 - [x] import statement (copy paste style)
 - [ ] lambdas (not closures)
-- [ ] static linking (get rid of libc), make list of syscalls, std library
+- [x] static linking (get rid of libc), make list of syscalls, std library
 - [ ] improve ui, add flag to run vs compile (-c, -r), output directory/files
 - [ ] tuples
-- [ ] different sized int/uint types
+- [x] different sized int/uint types
 - [ ] make if statements/blocks into expressions
 - [ ] global variables in (bss)
 - [x] compile time constants, arrays initialized to size of compile time constant
@@ -37,7 +37,7 @@ If you see some problems, please don't hesitate to submit a pull request!
 - [ ] generics (with typeclasses / type constraints)
 - [ ] proper testing
 - [ ] move to stack and ditch cabal
-- [ ] structs - figure out how to pass structs to functions in ABI
+- [ ] figure out ABI to do FFI
 - [ ] tagged union
 - [ ] closures (maybe)
 - [ ] modules

@@ -1,0 +1,35 @@
+import "std.haddr";
+
+const ABUN_MAX: i64 = 28124;
+
+proc is_abundant(n: i64) -> i8 {
+  let sum: i64 = 0;
+  for (let i: i64 = 1; i < n; i = i + 1) {
+    if (n % i == 0) sum = sum + i;
+  }
+  if (sum > n) return 1;
+  else return 0;
+}
+
+proc main() -> () {
+  let abundant: [i8; ABUN_MAX+1] = 0;
+  for (let i: i64 = 0; i <= ABUN_MAX; i = i + 1) {
+    abundant[i] = is_abundant(i);
+  }
+  puts("done getting abundants");
+  putch(10);
+  let sum: i64 = 0;
+  for (let i: i64 = 1; i <= ABUN_MAX; i = i + 1) {
+    let possible: i8 = 0;
+    for (let j: i64 = 1; j < i && possible == 0; j = j + 1) {
+      if (abundant[j] && abundant[i-j]) {
+        possible = 1;
+      }
+    }
+    if (possible == 0) {
+      sum = sum + i;
+    }
+  }
+
+  printi(sum);
+}

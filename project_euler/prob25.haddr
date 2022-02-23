@@ -1,0 +1,32 @@
+import "std.haddr";
+
+proc digits(n: i64) -> i64 {
+  if (n == 0) return 1;
+  let d: i64 = 0;
+  while (n > 0) {
+    d = d + 1;
+    n = n / 10;
+  }
+  return d;
+}
+
+proc main() -> () {
+  puts("need bignum implementation for this one");
+  putch(10);
+  exit(1);
+  let fibs: [i64; 10000] = 0;
+  fibs[0] = 1;
+  fibs[1] = 1;
+  for (let i: i64 = 2; i > 0; i = i + 1) {
+    fibs[i] = fibs[i-1] + fibs[i-2];
+    puts("fibs[");
+    puti(i);
+    puts("] = ");
+    puti(fibs[i]);
+    putch(10);
+    if (digits(fibs[i]) >= 1000) {
+      printi(i);
+      i = 0-12345;
+    }
+  }
+}

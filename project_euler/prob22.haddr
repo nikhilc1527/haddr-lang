@@ -1,0 +1,8 @@
+import "std.haddr";
+
+proc main(argv: **i8) -> () {
+  let fd: i64 = open(argv[1], O_RDONLY);
+
+  // implement sort in stdlib taking comparison function (qsort)
+  // implement dynamic array
+}

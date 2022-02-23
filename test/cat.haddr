@@ -4,12 +4,13 @@ const BUF_SIZE: i64 = 8096;
 
 proc main(argv: **i8) -> () {
   let filename: *i8 = argv[1];
-  let fd: i64 = syscall2(SYS_open, filename, O_RDONLY);
+  let fd: i64 = open(filename, O_RDONLY);
   let buf: [i8; BUF_SIZE] = 0;
-  let readed: i64 = syscall3(SYS_read, fd, buf, BUF_SIZE-1);
+  let readed: i64 = read(fd, buf, BUF_SIZE-1);
   while (readed > 0) {
     buf[readed] = 0;
     puts(buf);
-    readed = syscall3(SYS_read, fd, buf, BUF_SIZE-1);
+    readed = read(fd, buf, BUF_SIZE-1);
   }
+  close(fd);
 }

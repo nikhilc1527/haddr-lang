@@ -1,6 +1,7 @@
 module Main where
 
 import System.IO
+import GHC.Environment
 import System.Exit
 import System.Environment
 import Text.Printf
@@ -34,11 +35,17 @@ parse input_filepath str = do
       get_import_filepath :: String -> IO String
       get_import_filepath import_filepath = do
         input_abs <- makeAbsolute input_filepath
-        import_filepath <- makeAbsolute $ ((concat $ intersperse "/" $ init $ splitOn "/" input_abs) ++ "/" ++ import_filepath)
-        import_filepath_exists <- doesFileExist import_filepath
+        import_filepath_abs <- makeAbsolute $ ((concat $ intersperse "/" $ init $ splitOn "/" input_abs) ++ "/" ++ import_filepath)
+        import_filepath_exists <- doesFileExist $ import_filepath_abs
         case import_filepath_exists of
-          True -> return import_filepath
-          False -> error $ "import file " ++ import_filepath ++ " does not exist"
+          True -> return import_filepath_abs
+          False -> do
+            argv0 <- (head <$> getFullArgs) >>= makeAbsolute
+            std_filepath <- makeAbsolute $ ((concat $ intersperse "/" $ init $ splitOn "/" argv0) ++ "/std/" ++ import_filepath)
+            std_filepath_exists <- doesFileExist $ std_filepath
+            case std_filepath_exists of
+              True -> return std_filepath
+              False -> error $ "cannot import file: " ++ import_filepath ++ " does not exist"
 
       replace_imports :: [Expression] -> IO [Expression]
       replace_imports [] = return []
@@ -78,20 +85,20 @@ dumpASMOfFile filepath = do
 runFileForever :: FilePath -> IO ()
 runFileForever filepath = do
   compileFile filepath
-  let process = (shell "./main") {cwd = Just "compilation_out/"}
+  let process = (shell "./main")
   (_, stdout_handle, _, proc_handle) <- createProcess process
   waitForProcess proc_handle
   nullfile <- openFile "/dev/null" ReadMode
   output <- hGetContents $ maybe nullfile id stdout_handle
   putStr output
-  removeFile "compilation_out/main"
-  removeFile "compilation_out/main.asm"
-  removeFile "compilation_out/main.o"
+  -- removeFile "main"
+  -- removeFile "main.asm"
+  -- removeFile "main.o"
 
 runFile :: FilePath -> IO ()
 runFile filepath = do
   compileFile filepath
-  let process = (shell "./main") {cwd = Just "compilation_out/"}
+  let process = (shell "./main")
   (_, stdout_handle, _, proc_handle) <- createProcess process
   -- threadDelay 10000
   forkIO $ do
@@ -101,15 +108,15 @@ runFile filepath = do
   nullfile <- openFile "/dev/null" ReadMode
   output <- hGetContents $ maybe nullfile id stdout_handle
   putStr output
-  removeFile "compilation_out/main"
-  removeFile "compilation_out/main.asm"
-  removeFile "compilation_out/main.o"
+  -- removeFile "main"
+  -- removeFile "main.asm"
+  -- removeFile "main.o"
 
 compileFile :: FilePath -> IO ()
 compileFile filepath = do
   str <- readFile filepath
   is <- src_to_asm filepath str
-  handle <- openFile "compilation_out/main.asm" WriteMode
+  handle <- openFile "main.asm" WriteMode
   hPutStr handle is
   hFlush handle
   hClose handle
@@ -121,7 +128,7 @@ compileFile filepath = do
       run_proc cmd = do
         putStr "[CMD]: "
         putStrLn cmd
-        let process = (shell cmd) {cwd = Just "compilation_out/"}
+        let process = (shell cmd)
         (_, stdout_handle, _, proc_handle) <- createProcess process
         ecode <- waitForProcess proc_handle
         case ecode of
@@ -131,8 +138,9 @@ compileFile filepath = do
 main :: IO()
 main = do
   args <- getArgs
-  let file = head args
-  compileFile file
+  case head args of
+    "-r" -> runFileForever $ head $ tail args
+    file -> compileFile file
+  -- let file = head args
+  -- compileFile file
   return ()
-  -- return ()
-  -- processArgs args

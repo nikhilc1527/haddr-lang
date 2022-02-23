@@ -41,7 +41,8 @@ executable haddr-lang
                       split,
                       mtl,
                       directory,
-                      optparse-applicative
+                      optparse-applicative,
+                      system-argv0
     other-modules:
                       Parser,
                       Compiler

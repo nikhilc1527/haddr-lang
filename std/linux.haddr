@@ -6,9 +6,14 @@ const SYS_mmap: i64 = 9;
 const SYS_ioctl: i64 = 16;
 const SYS_nanosleep: i64 = 35;
 const SYS_getpid: i64 = 39;
+const SYS_clone: i64 = 56;
+const SYS_fork: i64 = 57;
+const SYS_vfork: i64 = 58;
+const SYS_execve: i64 = 59;
+const SYS_exit: i64 = 60;
+const SYS_wait4: i64 = 61;
 const SYS_fcntl: i64 = 72;
-
-
+const SYS_waitid: i64 = 247;
 
 const stdin: i64 = 0;
 const stdout: i64 = 1;

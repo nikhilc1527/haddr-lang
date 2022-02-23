@@ -1,5 +1,18 @@
 import "linux.haddr";
 
+proc read(fd: i64, buf: *i8, buf_len: i64) -> i64 {
+  return syscall3(SYS_read, fd, buf, buf_len);
+}
+proc write(fd: i64, buf: *i8, buf_len: i64) -> i64 {
+  return syscall3(SYS_write, fd, buf, buf_len);
+}
+proc open(filename: *i8, options: i64) -> i64 {
+  return syscall2(SYS_open, filename, options);
+}
+proc close(fd: i64) -> i64 {
+  return syscall1(SYS_close, fd);
+}
+
 proc strlen(str: *i8) -> i64 {
   let pointer: *i8 = str;
   let len: i64 = 0;
@@ -88,4 +101,8 @@ proc sleep(seconds: i64, nanoseconds: i64) -> () {
   timespec[0] = seconds;
   timespec[1] = nanoseconds;
   syscall2(SYS_nanosleep, timespec, 0);
+}
+
+proc exit(exit_code: i64) -> () {
+  syscall1(SYS_exit, exit_code);
 }

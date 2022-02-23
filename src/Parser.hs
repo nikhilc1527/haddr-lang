@@ -29,6 +29,7 @@ data Type =
   Type_Bool |
   Type_Pointer Type |
   Type_Arr Type Expression |
+  Type_Tuple [Type] |
   Type_Func [Type] Type |
   Type_Any |
   Type_Empty
@@ -391,7 +392,8 @@ typeP =
   (const Type_I8 <$> stringP "i8") <|> 
   (const Type_I32 <$> stringP "i32") <|> 
   (const Type_Empty <$> stringP "()") <|>
-  (Type_Arr <$> (wcharP '[' *> typeP) <*> (wcharP ';' *> (expressionP) <* wcharP ']'))
+  (Type_Arr <$> (wcharP '[' *> typeP) <*> (wcharP ';' *> (expressionP) <* wcharP ']')) <|>
+  (Type_Tuple <$> (wcharP '(' *> ((++) <$> (singleton <$> typeP) <*> (let tupleP = (const [] <$> wcharP ')') <|> ((:) <$> (wcharP ',' *> typeP) <*> tupleP) in tupleP))))
 
 constP :: Parser Char Expression
 constP = do
@@ -481,7 +483,9 @@ operatorLevelP next_op bs@(BinaryOperatorList ops) = do
   nexts <- next_parser <|> nop []
   return $ foldl (\ expr (operator, next_operand) -> operator expr next_operand) initial nexts
     where
+      operator_func :: Parser Char (Expression -> Expression -> Expression)
       operator_func = fold $ map (\(op_str, operator_func) -> const operator_func <$> (wss $ stringP op_str)) ops
+      next_parser :: Parser Char [(Expression -> Expression -> Expression, Expression)]
       next_parser = do
         operator <- operator_func
         operand <- next_op

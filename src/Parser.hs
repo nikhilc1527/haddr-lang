@@ -165,14 +165,18 @@ data Expression =
   Exp_Proc Expression [(String, Type)] Expression Type |
   Exp_ProcCall Expression [Expression] |
   Exp_Call Expression [Expression] |
+  Exp_PreIncrement Expression |
+  Exp_PreDecrement Expression |
   Exp_Plus Expression Expression |
   Exp_Minus Expression Expression |
   Exp_Mult Expression Expression |
   Exp_Div Expression Expression |
   Exp_BitOr Expression Expression |
   Exp_BitAnd Expression Expression |
-  Exp_BitNot Expression Expression |
+  Exp_BitNot Expression |
   Exp_BitXor Expression Expression |
+  Exp_LeftShift Expression Expression |
+  Exp_RightShift Expression Expression |
   Exp_Mod Expression Expression |
   Exp_Comma Expression Expression |
   Exp_Equality Expression Expression |
@@ -183,7 +187,9 @@ data Expression =
   Exp_GreaterThan Expression Expression |
   Exp_And Expression Expression |
   Exp_Or Expression Expression |
+  Exp_Not Expression |
   Exp_AddressOf Expression |
+  Exp_Dereference Expression |
   Exp_Assignment Expression Expression |
   Exp_Declaration String Type Expression |
   Exp_ConstDeclaration String Type Expression |
@@ -436,13 +442,16 @@ expressionP = head operators
         BinaryOperatorList [(("="), Exp_Assignment)],
         BinaryOperatorList [("||", Exp_Or)],
         BinaryOperatorList [("&&", Exp_And)],
-        BinaryOperatorList [("<=", Exp_LessEqual), (">=", Exp_GreaterEqual), ("<", Exp_LessThan), (">", Exp_GreaterThan), ("==", Exp_Equality), ("!=", Exp_NotEquality)],
-        PrefixUnaryOperatorList [("&", Exp_AddressOf)],
         BinaryOperatorList [("|", Exp_BitOr)],
         BinaryOperatorList [("^", Exp_BitXor)],
         BinaryOperatorList [("&", Exp_BitAnd)],
+        BinaryOperatorList [("<=", Exp_LessEqual), (">=", Exp_GreaterEqual), ("<", Exp_LessThan), (">", Exp_GreaterThan), ("==", Exp_Equality), ("!=", Exp_NotEquality)],
+        BinaryOperatorList [("<<", Exp_LeftShift), (">>", Exp_RightShift)],
         BinaryOperatorList [("+", Exp_Plus), ("-", Exp_Minus)],
         BinaryOperatorList [("*", Exp_Mult), ("/", Exp_Div), ("%", Exp_Mod)],
+        PrefixUnaryOperatorList [("&", Exp_AddressOf), ("*", Exp_Dereference)],
+        PrefixUnaryOperatorList [("!", Exp_Not), ("~", Exp_BitNot)],
+        PrefixUnaryOperatorList [("++", Exp_PreIncrement), ("--", Exp_PreDecrement)],
         FixedLevel 1
         -- highest precedence
         ]

@@ -1,0 +1,30 @@
+import "std.haddr";
+
+proc main(argv: **i8) -> () {
+  let filename: *i8 = argv[1];
+  if (filename == 0) {
+    puts("i need a file to read from!!!");
+    putch(10);
+    exit(1);
+  }
+  let fd: i64 = open(filename, O_RDONLY);
+  if (fd <= 0) {
+    puts("could not open file: ");
+    puts(filename);
+    putch(10);
+    exit(1);
+  }
+
+  let filesize: i64 = get_filesize(fd);
+
+  let file: *i8 = mmap_file(fd, filesize);
+  if (file < 0) {
+    prints("return value is less than 0");
+    prints(strerror(0-cast(file)));
+    exit(1);
+  }
+
+  
+
+  munmap(file, filesize);
+}

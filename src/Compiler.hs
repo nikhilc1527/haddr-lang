@@ -815,7 +815,7 @@ compile (Exp_SourceBlock exprs) = do
 
 compile (Exp_Empty) = return Type_Empty
 
-compile e = error $ "unhandled expression in compiler: \n" ++ (print_exp 0 e)
+compile e = error $ "unhandled expression in compiler: \n" ++ (show e)
 
 sourceCompiler :: [Expression] -> ([Instruction], [(String, String)], [String])
 sourceCompiler exprs = (compile_final_state.instructions, compile_final_state.bss, Set.toList $ compile_final_state.procs)

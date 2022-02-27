@@ -1,0 +1,83 @@
+import "std.haddr";
+
+const GRID_SIZE: i64 = 200;
+const INPUT_SIZE: i64 = 8192;
+
+proc main(argv: **i8) -> () {
+  let filename: *i8 = argv[1];
+  if (filename == 0) {
+    puts("i need a file to read from!!!");
+    putch(10);
+    exit(1);
+  }
+  let fd: i64 = open(filename, O_RDONLY);
+  if (fd <= 0) {
+    puts("could not open file: ");
+    puts(filename);
+    putch(10);
+    exit(1);
+  }
+
+  let grid: [[i8; 2*GRID_SIZE+1]; 2*GRID_SIZE+1] = 0;
+  let sx: i64 = GRID_SIZE;
+  let sy: i64 = GRID_SIZE;
+  let rx: i64 = GRID_SIZE;
+  let ry: i64 = GRID_SIZE;
+  let str: [i8; INPUT_SIZE] = 0;
+  let len: i64 = read(fd, str, INPUT_SIZE);
+  grid[sx][sy] = 1;
+  let visited: i64 = 1;
+
+  for (let i: i64 = 0; i < len; i = i + 2) {
+    if (str[i] == '>') sx = sx + 1;
+    else if (str[i] == '<') sx = sx - 1;
+    else if (str[i] == '^') sy = sy - 1;
+    else if (str[i] == 'v') sy = sy + 1;
+
+    if (str[i+1] == '>') rx = rx + 1;
+    else if (str[i+1] == '<') rx = rx - 1;
+    else if (str[i+1] == '^') ry = ry - 1;
+    else if (str[i+1] == 'v') ry = ry + 1;
+
+    puti(sx);
+    puts(", ");
+    puti(sy);
+    putch(10);
+    puti(rx);
+    puts(", ");
+    puti(ry);
+    putch(10);
+    putch(10);
+
+    if (sx < 0 || sx >= GRID_SIZE * 2 + 1) {
+      puts("sx overflowed bounds");
+      putch(10);
+      exit(1);
+    }
+    if (sy < 0 || sy >= GRID_SIZE * 2 + 1) {
+      puts("sy overflowed bounds");
+      putch(10);
+      exit(1);
+    }
+    if (rx < 0 || rx >= GRID_SIZE * 2 + 1) {
+      puts("rx overflowed bounds");
+      putch(10);
+      exit(1);
+    }
+    if (ry < 0 || ry >= GRID_SIZE * 2 + 1) {
+      puts("ry overflowed bounds");
+      putch(10);
+      exit(1);
+    }
+
+    if (grid[sx][sy] == 0) {
+      grid[sx][sy] = 1;
+      visited = visited + 1;
+    }
+    if (grid[rx][ry] == 0) {
+      grid[rx][ry] = 1;
+      visited = visited + 1;
+    }
+  }
+  printi(visited);
+}

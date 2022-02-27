@@ -1,0 +1,158 @@
+import "std.haddr";
+
+const LINE_LEN: i64 = 16;
+
+proc cast(bla: *i8) -> i64 {
+  return bla;
+}
+
+proc main(argv: **i8) -> () {
+  let filename: *i8 = argv[1];
+  if (filename == 0) {
+    puts("i need a file to read from!!!");
+    putch(10);
+    exit(1);
+  }
+  let fd: i64 = open(filename, O_RDONLY);
+  if (fd <= 0) {
+    puts("could not open file: ");
+    puts(filename);
+    putch(10);
+    exit(1);
+  }
+
+  let filesize: i64 = get_filesize(fd);
+
+  let file: *i8 = mmap_file(fd, filesize);
+  if (file < 0) {
+    prints("return value is less than 0");
+    prints(strerror(0-cast(file)));
+    exit(1);
+  }
+
+  let grid: [[i8; 1000]; 1000] = 0;
+  for (let i: i64 = 0; i < 1000; i = i + 1) {
+    for (let j: i64 = 0; j < 1000; j = j + 1) {
+      grid[i][j] = 0;
+    }
+  }
+  
+  for (let i: i64 = 0; i < filesize; i = i) {
+    let x1: i64 = 0;
+    let y1: i64 = 0;
+    let x2: i64 = 0;
+    let y2: i64 = 0;
+    if (strncmp("turn", &(file[i]), strlen("turn")) == 0) {
+      if (strncmp("on", &(file[i+5]), strlen("on")) == 0) {
+        i = i + 8;
+        while (file[i] >= '0' && file[i] <= '9') {
+          x1 = x1 * 10;
+          x1 = x1 + (file[i] - '0');
+          i = i + 1;
+        }
+        i = i + 1;
+        while (file[i] >= '0' && file[i] <= '9') {
+          y1 = y1 * 10;
+          y1 = y1 + (file[i] - '0');
+          i = i + 1;
+        }
+        i = i + 1;
+        i = i + 8;
+        while (file[i] >= '0' && file[i] <= '9') {
+          x2 = x2 * 10;
+          x2 = x2 + (file[i] - '0');
+          i = i + 1;
+        }
+        i = i + 1;
+        while (file[i] >= '0' && file[i] <= '9') {
+          y2 = y2 * 10;
+          y2 = y2 + (file[i] - '0');
+          i = i + 1;
+        }
+        i = i + 1;
+        for (let x: i64 = x1; x <= x2; x = x + 1) {
+          for (let y: i64 = y1; y <= y2; y = y + 1) {
+            grid[x][y] = 1;
+          }
+        }
+      }
+      else {
+        i = i + 9;
+        while (file[i] >= '0' && file[i] <= '9') {
+          x1 = x1 * 10;
+          x1 = x1 + (file[i] - '0');
+          i = i + 1;
+        }
+        i = i + 1;
+        while (file[i] >= '0' && file[i] <= '9') {
+          y1 = y1 * 10;
+          y1 = y1 + (file[i] - '0');
+          i = i + 1;
+        }
+        i = i + 1;
+        i = i + 8;
+        while (file[i] >= '0' && file[i] <= '9') {
+          x2 = x2 * 10;
+          x2 = x2 + (file[i] - '0');
+          i = i + 1;
+        }
+        i = i + 1;
+        while (file[i] >= '0' && file[i] <= '9') {
+          y2 = y2 * 10;
+          y2 = y2 + (file[i] - '0');
+          i = i + 1;
+        }
+        i = i + 1;
+        for (let x: i64 = x1; x <= x2; x = x + 1) {
+          for (let y: i64 = y1; y <= y2; y = y + 1) {
+            grid[x][y] = 0;
+          }
+        }
+      }
+    }
+    else {
+      i = i + 7;
+      while (file[i] >= '0' && file[i] <= '9') {
+        x1 = x1 * 10;
+        x1 = x1 + (file[i] - '0');
+        i = i + 1;
+      }
+      i = i + 1;
+      while (file[i] >= '0' && file[i] <= '9') {
+        y1 = y1 * 10;
+        y1 = y1 + (file[i] - '0');
+        i = i + 1;
+      }
+      i = i + 1;
+      i = i + 8;
+      while (file[i] >= '0' && file[i] <= '9') {
+        x2 = x2 * 10;
+        x2 = x2 + (file[i] - '0');
+        i = i + 1;
+      }
+      i = i + 1;
+      while (file[i] >= '0' && file[i] <= '9') {
+        y2 = y2 * 10;
+        y2 = y2 + (file[i] - '0');
+        i = i + 1;
+      }
+      i = i + 1;
+      for (let x: i64 = x1; x <= x2; x = x + 1) {
+        for (let y: i64 = y1; y <= y2; y = y + 1) {
+          grid[x][y] = 1 - grid[x][y];
+        }
+      }
+    }
+  }
+
+  let res: i64 = 0;
+  for (let i: i64 = 0; i < 1000; i = i + 1) {
+    for (let j: i64 = 0; j < 1000; j = j + 1) {
+      res = res + grid[i][j];
+    }
+  }
+
+  printi(res);
+
+  munmap(file, filesize);
+}

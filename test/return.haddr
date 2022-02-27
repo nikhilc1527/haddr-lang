@@ -1,0 +1,13 @@
+proc get_val(n: i64) -> i64 {
+  if (n > 0) {
+    return 2;
+  } else if (n < 0) {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+proc main() -> () {
+  let i: i64 = get_val(3);
+}

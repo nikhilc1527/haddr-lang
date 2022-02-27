@@ -23,29 +23,37 @@ proc strlen(str: *i8) -> i64 {
   return len;
 }
 
-proc puts(str: *i8) -> () {
+proc fputs(fd: i64, str: *i8) -> () {
   let len: i64 = strlen(str);
-  syscall3(SYS_write, stdout, str, len);
+  syscall3(SYS_write, fd, str, len);
+}
+proc puts(str: *i8) -> () {
+  fputs(stdout, str);
 }
 proc prints(str: *i8) -> () {
-  let len: i64 = strlen(str);
-  syscall3(SYS_write, stdout, str, len);
+  puts(str);
   putch(10);
 }
 
-proc getch() -> i8 {
+proc fgetch(fd: i64) -> i8 {
   let ch: i8 = 0;
-  syscall3(SYS_read, stdin, &ch, 1);
+  syscall3(SYS_read, fd, &ch, 1);
   return ch;
 }
-
-proc putch(c: i8) -> () {
-  syscall3(SYS_write, stdout, &c, 1);
+proc getch() -> i8 {
+  return fgetch(stdin);
 }
 
-proc printi(num: i64) -> () {
+proc fputch(fd: i64, c: i8) -> () {
+  syscall3(SYS_write, fd, &c, 1);
+}
+proc putch(c: i8) -> () {
+  fputch(stdout, c);
+}
+
+proc fputi(fd: i64, num: i64) -> () {
   if (num == 0) {
-    putch('0');
+    fputch(fd, '0');
   } else {
     let num_buffer: [i8; 23] = 0;
     let i: i64 = 22;
@@ -65,35 +73,16 @@ proc printi(num: i64) -> () {
       i = i - 1;
     }
 
-    syscall3(SYS_write, stdout, &(num_buffer[i+1]), 23 - i - 1);
+    write(fd, &(num_buffer[i+1]), 23 - i - 1);
   }
+}
+proc printi(num: i64) -> () {
+  fputi(stdout, num);
   putch(10);
 }
 
 proc puti(num: i64) -> () {
-  if (num == 0) {
-    putch('0');
-  } else {
-    let num_buffer: [i8; 23] = 0;
-    let i: i64 = 22;
-    let negative: i8 = 0;
-    if (num < 0) {
-      negative = 1;
-      num = 0-num;
-    }
-
-    while (num > 0) {
-      num_buffer[i] = num % 10 + '0';
-      num = num / 10;
-      i = i - 1;
-    }
-    if (negative > 0) {
-      num_buffer[i] = '-';
-      i = i - 1;
-    }
-
-    syscall3(SYS_write, stdout, &(num_buffer[i+1]), 23 - i - 1);
-  }
+  fputi(stdout, num);
 }
 
 proc sleep(seconds: i64, nanoseconds: i64) -> () {
@@ -105,4 +94,49 @@ proc sleep(seconds: i64, nanoseconds: i64) -> () {
 
 proc exit(exit_code: i64) -> () {
   syscall1(SYS_exit, exit_code);
+}
+
+proc get_filesize(fd: i64) -> i64 {
+  let stat: [i64; 18] = 0;
+  syscall2(SYS_fstat, fd, stat);
+  return stat[6];
+}
+
+proc mmap(addr: *i64, len: i64, prot: i64, flags: i64, fd: i64, offset: i64) -> *i8 {
+  return syscall6(SYS_mmap, addr, len, prot, flags, fd, offset);
+}
+
+proc min(a: i64, b: i64) -> i64 {
+  if (a < b) return a;
+  else return b;
+}
+proc max(a: i64, b: i64) -> i64 {
+  if (a > b) return a;
+  else return b;
+}
+
+proc mmap_file(fd: i64, size: i64) -> *i8 {
+  return syscall6(SYS_mmap, (&fd) - (&fd), size, PROT_READ, MAP_PRIVATE, fd, 0);
+}
+
+proc munmap(addr: *i8, len: i64) -> i64 {
+  return syscall2(SYS_munmap, addr, len);
+}
+
+proc strncmp(str1: *i8, str2: *i8, count: i64) -> i64 {
+  for (let i: i64 = 0; i < count; i = i + 1) {
+    if (str1[i] != str2[i]) return str1[i] - str2[i];
+  }
+  return 0;
+}
+
+proc strcmp(a: *i8, b: *i8) -> i64 {
+  let i: i64 = 0;
+  while (a[i] > 0 && b[i] > 0) {
+    if (a[i] != b[i]) return a[i] - b[i];
+    i = i + 1;
+  }
+  if (a[i] == 0 && b[i] == 0) return 0;
+  else if (a[i] == 0) return 0-1;
+  else return 1;
 }

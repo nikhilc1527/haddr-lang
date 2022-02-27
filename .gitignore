@@ -2,4 +2,5 @@
 *.o
 dist-newstyle/
 .ccls-cache
-compilation_out/main*
+main*
+input

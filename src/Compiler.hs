@@ -15,7 +15,7 @@ import Data.Foldable
 import qualified Debug.Trace as Trace
 
 register_list :: [String]
-register_list = ["rdi", "rsi", "rcx", "rdx", "r8", "r9"]
+register_list = ["rdi", "rsi", "rcx", "rdx", "r8", "r9", "r11"]
 
 sizeof :: Type -> Compiler Int
 sizeof (Type_I64) = return 8
@@ -39,6 +39,8 @@ rcx = Register "rcx"
 rdx = Register "rdx"
 r8 = Register "r8"
 r9 = Register "r9"
+r10 = Register "r10"
+r11 = Register "r11"
 al = Register "al"
 bl = Register "bl"
 eax = Register "eax"
@@ -60,6 +62,7 @@ data Instruction =
   Call Operand |
   Cmp Operand Operand |
   Je String |
+  Jne String |
   Jmp String |
   Jlt String |
   Jle String |
@@ -88,6 +91,7 @@ data CompilerState = CompilerState {
     instructions :: [Instruction],
     bss :: [(String, String)],
     cur_block :: Int,
+    cur_proc :: Int,
     procs :: Set.Set String,
     modul :: Map.Map String Symbol,
     constexprs :: Map.Map String (Type, Expression)
@@ -111,7 +115,9 @@ initialSymtab = Map.fromList
     ("syscall1", Sym_Function "syscall1" [Type_I64, Type_Any] (Type_Empty)),
     ("syscall2", Sym_Function "syscall2" [Type_I64, Type_Any, Type_Any] (Type_Empty)),
     ("syscall3", Sym_Function "syscall3" [Type_I64, Type_Any, Type_Any, Type_Any] (Type_Empty)),
-    ("syscall4", Sym_Function "syscall4" [Type_I64, Type_Any, Type_Any, Type_Any, Type_Any] (Type_Empty))
+    ("syscall4", Sym_Function "syscall4" [Type_I64, Type_Any, Type_Any, Type_Any, Type_Any] (Type_Empty)),
+    ("syscall5", Sym_Function "syscall5" [Type_I64, Type_Any, Type_Any, Type_Any, Type_Any, Type_Any] (Type_Empty)),
+    ("syscall6", Sym_Function "syscall6" [Type_I64, Type_Any, Type_Any, Type_Any, Type_Any, Type_Any, Type_Any] (Type_Empty))
   ]
 
 initialInstrs :: [Instruction]
@@ -120,17 +126,23 @@ initialInstrs = concat $ [
     syscall1_instrs,
     syscall2_instrs,
     syscall3_instrs,
-    syscall4_instrs
+    syscall4_instrs,
+    syscall5_instrs,
+    syscall6_instrs
   ]
-  where -- rdi, rsi, rcx, rdx, r8, r9
+  where
+    -- rdi, rsi, rcx, rdx, r8,  r9, r11
+    -- rax, rdi, rsi, rdx, r10, r8, r9
     syscall0_instrs = [Label "syscall0", Mov rax rdi, Syscall, Ret]
     syscall1_instrs = [Label "syscall1", Mov rax rdi, Mov rdi rsi, Syscall, Ret]
     syscall2_instrs = [Label "syscall2", Mov rax rdi, Mov rdi rsi, Mov rsi rcx, Syscall, Ret]
-    syscall3_instrs = [Label "syscall3", Mov rax rdi, Mov rdi rsi, Mov rsi rcx, Mov rcx rdx, Syscall, Ret]
-    syscall4_instrs = [Label "syscall4", Mov rax rdi, Mov rdi rsi, Mov rsi rcx, Mov rcx rdx, Mov rdx r8, Syscall, Ret]
+    syscall3_instrs = [Label "syscall3", Mov rax rdi, Mov rdi rsi, Mov rsi rcx, Syscall, Ret]
+    syscall4_instrs = [Label "syscall4", Mov rax rdi, Mov rdi rsi, Mov rsi rcx, Mov r10 r8, Syscall, Ret]
+    syscall5_instrs = [Label "syscall5", Mov rax rdi, Mov rdi rsi, Mov rsi rcx, Mov r10 r8, Mov r9 r8, Syscall, Ret]
+    syscall6_instrs = [Label "syscall6", Mov rax rdi, Mov rdi rsi, Mov rsi rcx, Mov r10 r8, Mov r8 r9, Mov r9 r11, Syscall, Ret]
 
 initialCompilerState :: CompilerState
-initialCompilerState = CompilerState 0 initialSymtab 0 initialInstrs [] 0 (Set.fromList ["flush_out"]) Map.empty Map.empty
+initialCompilerState = CompilerState 0 initialSymtab 0 initialInstrs [] 0 0 (Set.fromList ["flush_out"]) Map.empty Map.empty
 
 newtype Compiler a = Compiler { run :: (CompilerState) -> (CompilerState, a) }
 
@@ -163,6 +175,12 @@ get_counter = Compiler $ \state -> (state, state.counter)
 
 put_state :: CompilerState -> Compiler ()
 put_state new_state = Compiler $ const (new_state, ())
+
+get_proc :: Compiler Int
+get_proc = Compiler $ \state -> (state, state.cur_proc)
+
+put_proc :: Int -> Compiler ()
+put_proc new_state = Compiler $ \st -> (st {cur_proc = new_state}, ())
 
 add_to_modul :: Symbol -> Compiler ()
 add_to_modul sym@(Sym_Function name params rettype) = Compiler $ \state -> (state { modul = Map.insert name sym state.modul }, ())
@@ -223,6 +241,7 @@ printInstrs ((Div e1):rest) = "\tdiv " ++ (printOperand e1) ++ "\n" ++ (printIns
 printInstrs ((Push e1):rest) = "\tpush " ++ (printOperand e1) ++ "\n" ++ (printInstrs rest)
 printInstrs ((Pop e1):rest) = "\tpop " ++ (printOperand e1) ++ "\n" ++ (printInstrs rest)
 printInstrs ((Je e1):rest) = "\tje " ++ e1 ++ "\n" ++ (printInstrs rest)
+printInstrs ((Jne e1):rest) = "\tjne " ++ e1 ++ "\n" ++ (printInstrs rest)
 printInstrs ((Jmp e1):rest) = "\tjmp " ++ e1 ++ "\n" ++ (printInstrs rest)
 printInstrs ((Jlt e1):rest) = "\tjl " ++ e1 ++ "\n" ++ (printInstrs rest)
 printInstrs ((Jle e1):rest) = "\tjle " ++ e1 ++ "\n" ++ (printInstrs rest)
@@ -236,7 +255,7 @@ type_equivalent = (==)
 
 type_can_be :: Type -> Type -> Bool
 type_can_be (Type_Arr sub1 len) (Type_Pointer sub2) = sub1 `type_can_be` sub2
-type_can_be (Type_Pointer sub1) (Type_I64) = True
+type_can_be (Type_Pointer _) (Type_I64) = True
 type_can_be (Type_I8) (Type_I64) = True
 type_can_be (Type_I8) (Type_I32) = True
 type_can_be (Type_I32) (Type_I8) = True
@@ -390,7 +409,7 @@ compile arrindex@(Exp_ArrIndex arr index) = do
       put_instr $ Mov ebx (Addr "DWORD [rax]")
       put_instr $ Mov rax rbx
   return lvalue_type
-compile (Exp_AddressOf s) = compile_lvalue s
+compile (Exp_AddressOf s) = Type_Pointer <$> compile_lvalue s
 compile (Exp_Plus e1 e2) = do
   a <- compile e1
   case e2 of
@@ -569,6 +588,25 @@ compile (Exp_Equality e1 e2) = do
       Label label2
     ]
   return Type_Bool
+compile (Exp_NotEquality e1 e2) = do
+  a <- compile e1
+  put_instr $ Push $ rax
+  b <- compile e2
+  increment_counter
+  counter <- get_counter
+  let label1 = ("COMPARISON" ++ (show counter))
+  let label2 = ("COMPARISON_END" ++ (show counter))
+  put_instrs $ [
+      Pop $ rbx,
+      Cmp rax rbx,
+      Jne $ label1,
+      Mov rax (Literal 0),
+      Jmp label2,
+      Label label1, 
+      Mov rax (Literal 1),
+      Label label2
+    ]
+  return Type_Bool
 compile (Exp_And e1 e2) = do
   a <- compile e1
   put_instr $ Push $ rax
@@ -696,10 +734,18 @@ compile (Exp_Proc (Exp_String name) args body rettype) = do
   put_instrs $ [ Label name, Push $ rbp, Mov rbp rsp ]
   old_state <- get_state
   push_args args args_registers
+  increment_counter
+  old_proc <- get_proc
+  cur_proc <- get_counter
+  put_proc cur_proc
+  
   body_instrs <- compile body
+  
+  put_proc old_proc
   new_state <- get_state
   put_state $ new_state { rsp = old_state.rsp, symtab = old_state.symtab }
-  put_instrs $ [ Add rsp (Literal $ 8 * (length args)) ] <> [ Pop rbp, Ret ]
+  -- put_instrs $ [ Label $ "PROCEND" ++ show cur_proc, Add rsp (Literal $ 8 * (length args)) ] <> [ Pop rbp, Ret ]
+  put_instrs $ [ Label $ "PROCEND" ++ show cur_proc, Mov rsp rbp ] <> [ Pop rbp, Ret ]
   return Type_Empty
     where
       args_registers :: [Operand]
@@ -719,6 +765,7 @@ compile proccallexp@(Exp_ProcCall procname args) = do
   functype <- compile procname
   let (Type_Func params_type res_type) = functype
   if (length params_type /= length args) then error $ "expected " ++ (show $ length params_type) ++ " parameters but got " ++ (show $ length args) else return ()
+  if (length args > 7) then error $ "can pass a maximum of 7 arguments to a procedure (for now)" else return ()
   put_instr $ Push $ rax
   process_args args params_type
   
@@ -743,9 +790,9 @@ compile proccallexp@(Exp_ProcCall procname args) = do
         modify_state $ (\st -> st { rsp = st.rsp - 8 })
 
 compile (Exp_Return exp) = do
-  block <- get_block
+  block <- get_proc
   compile exp
-  put_instr $ Jmp $ "BLOCKEND" ++ (show block)
+  put_instr $ Jmp $ "PROCEND" ++ (show block)
   return Type_Empty
 
 compile (Exp_SourceBlock exprs) = do

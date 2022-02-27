@@ -176,6 +176,7 @@ data Expression =
   Exp_Mod Expression Expression |
   Exp_Comma Expression Expression |
   Exp_Equality Expression Expression |
+  Exp_NotEquality Expression Expression |
   Exp_LessEqual Expression Expression |
   Exp_GreaterEqual Expression Expression |
   Exp_LessThan Expression Expression |
@@ -194,6 +195,7 @@ data Expression =
   Exp_StringLiteral String |
   Exp_SourceBlock [Expression] |
   Exp_Import String |
+  Exp_Syscall6 Expression Expression Expression Expression Expression Expression |
   Exp_Empty |
   Exp_INVALID
   deriving (Eq, Show)
@@ -218,6 +220,7 @@ print_exp spaces (Exp_GreaterThan e1 e2) = (sp spaces) ++ "GT\n" ++ (print_exp (
 print_exp spaces (Exp_Equality e1 e2) = (sp spaces) ++ "EQUALITY\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_And e1 e2) = (sp spaces) ++ "AND\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_Or e1 e2) = (sp spaces) ++ "OR\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+print_exp spaces (Exp_AddressOf e) = (sp spaces) ++ "ADDRESS_OF\n" ++ (print_exp (spaces+2) e)
 print_exp spaces (Exp_Assignment e1 e2) = (sp spaces) ++ "ASSIGNMENT\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_Declaration varname typename e) = (sp spaces) ++ "DECLARATION\n" ++ (sp $ spaces+2) ++ varname ++ "\n" ++ (print_exp (spaces+2) e)
 print_exp spaces (Exp_ArrIndex e1 e2) = (sp spaces) ++ "ARR_INDEX\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
@@ -367,7 +370,7 @@ parseBlock = Exp_SourceBlock <$> (wcharP '{' *> block)
 
 importP :: Parser Char Expression
 importP = do
-  stringP "import "
+  ws *> stringP "import "
   filename_str <- stringLiteralP
   let (Exp_StringLiteral filename) = filename_str
   wcharP ';'
@@ -433,7 +436,7 @@ expressionP = head operators
         BinaryOperatorList [(("="), Exp_Assignment)],
         BinaryOperatorList [("||", Exp_Or)],
         BinaryOperatorList [("&&", Exp_And)],
-        BinaryOperatorList [("<=", Exp_LessEqual), (">=", Exp_GreaterEqual), ("<", Exp_LessThan), (">", Exp_GreaterThan), ("==", Exp_Equality)],
+        BinaryOperatorList [("<=", Exp_LessEqual), (">=", Exp_GreaterEqual), ("<", Exp_LessThan), (">", Exp_GreaterThan), ("==", Exp_Equality), ("!=", Exp_NotEquality)],
         PrefixUnaryOperatorList [("&", Exp_AddressOf)],
         BinaryOperatorList [("|", Exp_BitOr)],
         BinaryOperatorList [("^", Exp_BitXor)],

@@ -1,0 +1,48 @@
+import "std.haddr";
+
+proc next_int(fd: i64) -> i64 {
+  let res: i64 = 0;
+  let cur: i8 = 0;
+  let readed: i64 = read(fd, &cur, 1);
+  if (readed <= 0) return 0-1;
+  while (readed > 0 && cur >= '0' && cur <= '9') {
+    res = res * 10 + (cur - '0');
+    readed = read(fd, &cur, 1);
+  }
+  return res;
+}
+
+proc main(argv: **i8) -> () {
+  let filename: *i8 = argv[1];
+  if (filename == 0) {
+    puts("i need a file to read from!!!");
+    putch(10);
+    exit(1);
+  }
+  let fd: i64 = open(filename, O_RDONLY);
+  if (fd <= 0) {
+    puts("could not open file: ");
+    puts(filename);
+    putch(10);
+    exit(1);
+  }
+
+  let sum: i64 = 0;
+  while (1 > 0) {
+    let first: i64 = next_int(fd);
+    if (first < 0) {
+      printi(sum);
+      exit(0);
+    }
+    let second: i64 = next_int(fd);
+    let third: i64 = next_int(fd);
+    sum = sum + first * second * third;
+    if (first > second) {
+      if (first > third) sum = sum + 2 * second + 2 * third;
+      else sum = sum + 2 * first + 2 * second;
+    } else {
+      if (second > third) sum = sum + 2 * first + 2 * third;
+      else sum = sum + 2 * first + 2 * second;
+    }
+  }
+}

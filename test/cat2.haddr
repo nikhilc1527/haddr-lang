@@ -1,0 +1,12 @@
+import "std.haddr";
+
+proc main(argv: **i8) -> () {
+  let filename: *i8 = argv[1];
+  let fd: i64 = open(filename, O_RDONLY);
+  let size: i64 = get_filesize(fd);
+  let file: *i8 = mmap_file(fd, size);
+  for (let i: i64 = 0; i < size; i = i + 1) {
+    putch(file[i]);
+  }
+  munmap(file, size);
+}

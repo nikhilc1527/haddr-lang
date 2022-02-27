@@ -1,0 +1,32 @@
+import "std.haddr";
+
+proc main(argv: **i8) -> () {
+  let filename: *i8 = argv[1];
+  if (filename == 0) {
+    puts("i need a file to read from!!!");
+    putch(10);
+    exit(1);
+  }
+  let fd: i64 = open(filename, O_RDONLY);
+  if (fd <= 0) {
+    puts("could not open file: ");
+    puts(filename);
+    putch(10);
+    exit(1);
+  }
+  
+  let floor_num: i64 = 0;
+  let cur: i8 = 0;
+  let readed: i64 = read(fd, &cur, 1);
+  while (readed > 0) {
+    if (cur == '(') floor_num = floor_num + 1;
+    else if (cur == ')') floor_num = floor_num - 1;
+    else {
+      puts("unexpected input character: ");
+      putch(cur);
+      putch(10);
+    }
+    readed = read(fd, &cur, 1);
+  }
+  printi(floor_num);
+}

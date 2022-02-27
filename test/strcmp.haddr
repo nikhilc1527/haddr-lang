@@ -1,0 +1,15 @@
+// test taken from https://en.cppreference.com/w/c/string/byte/strcmp
+
+import "std.haddr";
+
+proc demo(lhs: *i8, rhs: *i8) -> () {
+  let cmp: i64 = strcmp(lhs, rhs);
+  printi(cmp);
+}
+
+proc main() -> () {
+  let str: *i8 = "Hello World!";
+  demo(str, "Hello!");
+  demo(str, "Hello");
+  demo(str, "Hello there");
+}

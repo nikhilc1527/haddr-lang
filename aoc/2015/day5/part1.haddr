@@ -1,0 +1,58 @@
+import "std.haddr";
+
+const LINE_LEN: i64 = 16;
+
+proc is_line_gud(line: *i8) -> i8 {
+  for (let i: i64 = 0; i < LINE_LEN-1; i = i + 1) {
+    if ((line[i] == 'a' && line[i+1] == 'b') ||
+        (line[i] == 'c' && line[i+1] == 'd') ||
+        (line[i] == 'p' && line[i+1] == 'q') ||
+        (line[i] == 'x' && line[i+1] == 'y')) {
+      return 0;
+    }
+  }
+  let vowels: i64 = 0;
+  for (let i: i64 = 0; i < LINE_LEN; i = i + 1) {
+    if (line[i] == 'a' || line[i] == 'e' || line[i] == 'i' || line[i] == 'o' || line[i] == 'u') {
+      vowels = vowels + 1;
+    }
+  }
+  if (vowels < 3) return 0;
+  for (let i: i64 = 0; i < LINE_LEN-1; i = i + 1) {
+    if (line[i] == line[i+1]) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+proc main(argv: **i8) -> () {
+  let filename: *i8 = argv[1];
+  if (filename == 0) {
+    puts("i need a file to read from!!!");
+    putch(10);
+    exit(1);
+  }
+  let fd: i64 = open(filename, O_RDONLY);
+  if (fd <= 0) {
+    puts("could not open file: ");
+    puts(filename);
+    putch(10);
+    exit(1);
+  }
+
+  let res: i64 = 0;
+  let line: [i8; LINE_LEN+1] = 0;
+  let readed: i64 = read(fd, line, LINE_LEN+1);
+  let i: i64 = 0;
+  while (readed > 0) {
+    let is_gud: i8 = is_line_gud(line);
+    if (is_gud > 0) {
+      res = res + 1;
+    }
+  
+    readed = read(fd, line, LINE_LEN+1);
+    i = i + 1;
+  }
+  printi(res);
+}

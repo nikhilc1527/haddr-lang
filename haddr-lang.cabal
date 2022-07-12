@@ -42,7 +42,10 @@ executable haddr-lang
                       mtl,
                       directory,
                       optparse-applicative,
-                      system-argv0
+                      system-argv0,
+                      parser-combinators,
+                      megaparsec,
+                      parsers
     other-modules:
                       Parser,
                       Compiler

@@ -11,6 +11,9 @@ import Data.Hashable
 import Text.Printf
 import qualified Data.HashMap as Map
 import Control.Applicative
+import Control.Monad
+
+import qualified Control.Monad.Combinators as Combos
 
 preprocess :: String -> String
 preprocess = uncomment
@@ -116,6 +119,8 @@ instance Monad (Parser i) where
     (output, rest) <- p input
     (k output).run rest
 
+instance Eq i => MonadPlus (Parser i)
+
 instance Eq i => Semigroup (Parser i a) where
   a <> b = a <|> b
   
@@ -150,13 +155,7 @@ stringP :: String -> Parser Char String
 stringP = sequenceA . map charP
 
 spanP :: Eq i => (i -> Bool) -> Parser i [i]
-spanP pred = Parser $ \input ->
-  let (a, b) = span pred input.str
-  in case a of
-       [] -> case b of
-              [] -> Left $ EndOfInput
-              (x:xs) -> Left $ Unexpected x input.pos
-       _ -> Right (a, input { str = b, pos = input.pos+(length a) } )
+spanP pred = some $ satisfyP pred
 
 data Expression =
   Exp_If Expression Expression Expression |
@@ -226,11 +225,15 @@ print_exp spaces (Exp_GreaterThan e1 e2) = (sp spaces) ++ "GT\n" ++ (print_exp (
 print_exp spaces (Exp_Equality e1 e2) = (sp spaces) ++ "EQUALITY\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_And e1 e2) = (sp spaces) ++ "AND\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_Or e1 e2) = (sp spaces) ++ "OR\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+print_exp spaces (Exp_BitAnd e1 e2) = (sp spaces) ++ "BIT_AND\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
+print_exp spaces (Exp_BitOr e1 e2) = (sp spaces) ++ "BIT_OR\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_AddressOf e) = (sp spaces) ++ "ADDRESS_OF\n" ++ (print_exp (spaces+2) e)
 print_exp spaces (Exp_Assignment e1 e2) = (sp spaces) ++ "ASSIGNMENT\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_Declaration varname typename e) = (sp spaces) ++ "DECLARATION\n" ++ (sp $ spaces+2) ++ varname ++ "\n" ++ (print_exp (spaces+2) e)
 print_exp spaces (Exp_ArrIndex e1 e2) = (sp spaces) ++ "ARR_INDEX\n" ++ (print_exp (spaces+2) e1) ++ (print_exp (spaces+2) e2)
 print_exp spaces (Exp_Return e) = (sp spaces) ++ "RETURN" ++ "\n" ++ (print_exp (spaces+2) e)
+print_exp spaces (Exp_PreIncrement e) = (sp spaces) ++ "PRE_INCREMENT" ++ "\n" ++ (print_exp (spaces+2) e)
+print_exp spaces (Exp_PreDecrement e) = (sp spaces) ++ "PRE_DECREMENT" ++ "\n" ++ (print_exp (spaces+2) e)
 print_exp spaces (Exp_Int i) = (sp spaces) ++ (show i) ++ "\n"
 print_exp spaces (Exp_Float i) = (sp spaces) ++ (show i) ++ "\n"
 print_exp spaces (Exp_String s) = (sp spaces) ++ s ++ "\n"
@@ -264,7 +267,7 @@ stringLiteralP = do
   return $ Exp_StringLiteral $ str
 
 ws :: Parser Char String
-ws = Parser $ \input -> Right $ let (a, b) = span isSpace input.str in (a, input {str=b, pos=input.pos + (length a)})
+ws = many $ satisfyP isSpace
 
 wordP :: Parser Char String
 wordP = do
@@ -277,28 +280,6 @@ wordP = do
 wss :: Parser Char a -> Parser Char a
 wss parser = ws *> parser <* ws
 
-nop :: a -> Parser i a
-nop a = Parser $ \input -> Right $ (a, input)
-
-notReallyP :: Eq i => i -> Parser i i
-notReallyP i = Parser $ \input ->
-  case input.str of
-    (f:r) | f == i -> Right (f, input)
-          | True -> Left $ Expected i [f] input.pos
-    [] -> Left EndOfInput
-
-sepParserBy :: Parser Char Expression -> Parser Char a -> Parser Char b -> Parser Char [Expression]
-sepParserBy parser separator finisher = do
-  first <- parser
-  rest <- exprs <|> (const [] <$> finisher)
-  return (first:rest)
-  where
-    exprs = do
-      sep <- separator
-      expr <- parser
-      rest <- exprs <|> (const [] <$> finisher)
-      return $ (expr:rest)  
-
 ifP :: Parser Char Expression
 ifP = do
   wss $ stringP "if"
@@ -306,9 +287,10 @@ ifP = do
   cond <- expressionP
   wcharP ')'
   inside <- parseBlock <|> statementP
-  else_block <- else_parser <|> nop Exp_Empty
+  else_block <- (maybe Exp_Empty id) <$> optional else_parser
   return $ Exp_If cond inside else_block
     where
+      else_parser :: Parser Char Expression
       else_parser = do
         wss $ stringP "else"
         inside <- parseBlock <|> statementP
@@ -340,11 +322,7 @@ procP :: Parser Char Expression
 procP = do
   ws *> stringP "proc "
   func_name <- wss $ (Exp_String <$> wordP)
-  args <- do
-    wcharP '('
-    args <- argsP <|> nop []
-    wcharP ')'
-    return args
+  args <- Combos.between (charP '(') (charP ')') $ argP `Combos.sepBy` (wcharP ',')
   ws
   stringP "->"
   ws
@@ -352,27 +330,14 @@ procP = do
   body <- parseBlock <|> statementP
   return $ Exp_Proc func_name args body rettype
     where
-      argsP = do
+      argP = do
         name <- wordP
         wcharP ':'
         typename <- typeP
-        nexts <- (wcharP ',' *> argsP) <|> nop []
-        return $ (name, typename):nexts
-      commas_to_list :: Expression -> [Expression]
-      commas_to_list (Exp_Comma e1 e2) = ((commas_to_list e1) ++ [e2])
-      commas_to_list e = [e]
-
--- commentP :: Parser Char ()
--- commentP = do
-  
+        return (name, typename)  
 
 parseBlock :: Parser Char Expression
-parseBlock = Exp_SourceBlock <$> (wcharP '{' *> block)
-    where
-      block = do
-        cur <- statementP
-        rest <- block <|> (const [] <$> (wcharP '}'))
-        return $ (cur:rest)
+parseBlock = Exp_SourceBlock <$> (Combos.between (wcharP '{') (wcharP '}') $ many statementP)
 
 importP :: Parser Char Expression
 importP = do
@@ -433,12 +398,45 @@ instance Show OperatorLevel where
   show (BinaryOperatorList bs) = show $ map fst bs
   show (PrefixUnaryOperatorList bs) = show $ map fst bs
 
+prefixUnaryOperatorP :: Parser Char (Expression -> Expression)
+prefixUnaryOperatorP = composed
+  where
+    operator_funcs = map prefixUnaryOperatorLevelP $ prefix_unary_operator_list
+    composed = foldr monad_compose (pure id) operator_funcs
+    monad_compose :: Parser Char (Expression -> Expression) -> Parser Char (Expression -> Expression) -> Parser Char (Expression -> Expression)
+    -- monad_compose a b = do
+    --   a_ <- a
+    --   b_ <- b
+    --   return $ a_ . b_
+    -- monad_compose a b = (.) <$> a <*> b
+    monad_compose = (<*>) . ((.) <$>)
+
+    prefix_unary_operator_list :: [OperatorLevel]
+    prefix_unary_operator_list = [
+        PrefixUnaryOperatorList [("&", Exp_AddressOf), ("*", Exp_Dereference)],
+        PrefixUnaryOperatorList [("!", Exp_Not), ("~", Exp_BitNot)],
+        PrefixUnaryOperatorList [("++", Exp_PreIncrement), ("--", Exp_PreDecrement)]
+      ]
+  
+    prefixUnaryOperatorLevelP :: OperatorLevel -> Parser Char (Expression -> Expression)
+    prefixUnaryOperatorLevelP cur_level@(PrefixUnaryOperatorList ops) = do
+      matched <- optional $ fold $ map (\(s, e) -> (const e <$> (wss $ stringP s))) ops
+      ret <- case matched of
+        Just f -> do
+          next_unary <- prefixUnaryOperatorP
+          return $ f . next_unary
+        Nothing -> return $ id
+      return $ ret
+
 expressionP :: Parser Char Expression
-expressionP = head operators
+-- expressionP = do
+--   unaries <- prefixUnaryOperatorP
+--   parsed <- head operators
+--   return $ unaries $ parsed
+expressionP = ($) <$> prefixUnaryOperatorP <*> (head operators)
     where
       operators_raw = [
         -- lowest precedence
-        BinaryOperatorList [((","), Exp_Comma)],
         BinaryOperatorList [(("="), Exp_Assignment)],
         BinaryOperatorList [("||", Exp_Or)],
         BinaryOperatorList [("&&", Exp_And)],
@@ -449,9 +447,6 @@ expressionP = head operators
         BinaryOperatorList [("<<", Exp_LeftShift), (">>", Exp_RightShift)],
         BinaryOperatorList [("+", Exp_Plus), ("-", Exp_Minus)],
         BinaryOperatorList [("*", Exp_Mult), ("/", Exp_Div), ("%", Exp_Mod)],
-        PrefixUnaryOperatorList [("&", Exp_AddressOf), ("*", Exp_Dereference)],
-        PrefixUnaryOperatorList [("!", Exp_Not), ("~", Exp_BitNot)],
-        PrefixUnaryOperatorList [("++", Exp_PreIncrement), ("--", Exp_PreDecrement)],
         FixedLevel 1
         -- highest precedence
         ]
@@ -459,67 +454,33 @@ expressionP = head operators
       operators = foldr (\ ops_list new_ops -> let op = operatorLevelP (head new_ops) ops_list in (op:new_ops)) [parseFinal] operators_raw
 
 operatorLevelP :: (Parser Char Expression) -> OperatorLevel -> (Parser Char Expression)
--- array subscript and procedure call
 operatorLevelP next_op (FixedLevel 1) = do
   next <- next_op
-  arr_or_calls <- get_arr_or_calls <|> nop []
+  arr_or_calls <- many $ (arrIndexP <|> procCallP)
   return $ foldl (\lv op -> op lv) next arr_or_calls
--- operatorLevelP next_op (FixedLevel 1) = arrIndexP <|> procCallP <|> next_op
   where
-    get_arr_or_calls = do
-      cur <- arrIndexP <|> procCallP
-      nexts <- get_arr_or_calls <|> nop []
-      return $ cur:nexts
-    arrIndexP = do
-      wcharP '['
-      value <- expressionP
-      wcharP ']'
-      return $ (flip Exp_ArrIndex) value
-    procCallP = do
-      wcharP '('
-      params <- (commas_to_list <$> expressionP) <|> nop []
-      wcharP ')'
-      return $ (flip Exp_ProcCall) params
-        where
-          commas_to_list :: Expression -> [Expression]
-          commas_to_list (Exp_Comma e1 e2) = ((commas_to_list e1) ++ [e2])
-          commas_to_list e = [e]
+    arrIndexP = Combos.between (wcharP '[') (wcharP ']') $ ((flip Exp_ArrIndex) <$> expressionP)
+    procCallP = Combos.between (wcharP '(') (wcharP ')') $ ((flip Exp_ProcCall) <$> (expressionP `Combos.sepBy` (wcharP ',')))
 
-operatorLevelP next_op us@(PrefixUnaryOperatorList ops) = (do
-  matched <- foldr (<|>) empty $ map (\(s, e) -> (const e <$> stringP s)) ops
-  next_parse <- operatorLevelP next_op us
-  return $ matched $ next_parse) <|> next_op
-
-operatorLevelP next_op bs@(BinaryOperatorList ops) = do
+operatorLevelP next_op cur_level@(BinaryOperatorList ops) = do
+  -- prefix_unaries <- prefixUnaryOperatorP
   initial <- next_op
-  nexts <- next_parser <|> nop []
-  return $ foldl (\ expr (operator, next_operand) -> operator expr next_operand) initial nexts
+  nexts <- many $ next_parser
+  return $ -- prefix_unaries $ 
+    foldl (\ expr (operator, next_operand) -> operator expr next_operand) initial nexts
     where
       operator_func :: Parser Char (Expression -> Expression -> Expression)
-      operator_func = fold $ map (\(op_str, operator_func) -> const operator_func <$> (wss $ stringP op_str)) ops
-      next_parser :: Parser Char [(Expression -> Expression -> Expression, Expression)]
-      next_parser = do
-        operator <- operator_func
-        operand <- next_op
-        nexts <- next_parser <|> nop []
-        return ((operator, operand):nexts)
+      operator_func = fold $ map (\(op_str, op_func) -> const op_func <$> (wss $ stringP op_str)) ops
+      next_parser :: Parser Char (Expression -> Expression -> Expression, Expression)
+      next_parser = (,) <$> operator_func <*> next_op
+
 operatorLevelP _ _ = error "unreachable"
 
 parseFinal :: Parser Char Expression
-parseFinal = numP <|> (Exp_String <$> wordP) <|> parensP <|> stringLiteralP <|> charLiteralP
-  where
-    parensP = do
-      wcharP '('
-      exp <- expressionP
-      wcharP ')'
-      return exp
+parseFinal = numP <|> (Exp_String <$> wordP) <|> stringLiteralP <|> charLiteralP <|> (Combos.between (wcharP '(') (wcharP ')') $ expressionP)
 
 sourceFileParser :: Parser Char [Expression]
-sourceFileParser = do
-  (wss $ eofP []) <|> do
-    cur <- importP <|> procP <|> (constP <* wcharP ';')
-    next <- sourceFileParser
-    return (cur:next)
+sourceFileParser = many $ (importP <|> procP <|> (constP <* wcharP ';'))
 
 runParser :: Parser Char Expression-> String -> IO ()
 runParser parser input = putStrLn $ case parser.run $ Input input 0 of

@@ -657,7 +657,7 @@ compile (Exp_If cond_exp true_exp false_exp) = do
   cond_type <- compile cond_exp
   case cond_type of
     Type_Bool -> return ()
-    _ -> error "condition expression has to be boolean"
+    _ -> error $ "condition expression has to be boolean: " ++ (show cond_exp)
   put_instrs $ [Cmp rax (Literal 0), Je label1]
   true_instrs <- compile true_exp
   put_instrs $ [Jmp label2, Label label1]
@@ -676,7 +676,7 @@ compile (Exp_While cond_exp body_exp) = do
   cond_type <- compile cond_exp
   case cond_type of
     Type_Bool -> return ()
-    _ -> error "condition expression has to be boolean"
+    _ -> error $ "condition expression has to be boolean: " ++ (show cond_exp)
   put_instrs $ [Cmp rax (Literal 0), Je label2]
   body_instrs <- compile body_exp
   put_instrs $ [Jmp label1, Label label2]

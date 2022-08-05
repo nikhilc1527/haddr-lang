@@ -194,6 +194,8 @@ data Expression =
   Exp_ConstDeclaration String Type Expression |
   Exp_ArrIndex Expression Expression |
   Exp_Return Expression |
+  Exp_Continue |
+  Exp_Break |
   Exp_Int Int |
   Exp_Float Float |
   Exp_String String |
@@ -348,7 +350,13 @@ importP = do
   return $ Exp_Import $ filename
 
 statementP :: Parser Char Expression
-statementP = controlStructureP <|> ((declarationP <|> returnExpP <|> expressionP) <* (wcharP ';'))
+statementP = controlStructureP <|> ((declarationP <|> returnExpP <|> breakP <|> continueP <|> expressionP) <* (wcharP ';'))
+
+continueP :: Parser Char Expression
+continueP = const Exp_Continue <$> stringP "continue"
+
+breakP :: Parser Char Expression
+breakP = const Exp_Continue <$> stringP "break"
 
 returnExpP :: Parser Char Expression
 returnExpP = do
@@ -367,7 +375,7 @@ typeP =
   (const Type_I32 <$> stringP "i32") <|> 
   (const Type_Empty <$> stringP "()") <|>
   (Type_Arr <$> (wcharP '[' *> typeP) <*> (wcharP ';' *> (expressionP) <* wcharP ']')) <|>
-  (Type_Tuple <$> (wcharP '(' *> ((++) <$> (singleton <$> typeP) <*> (let tupleP = (const [] <$> wcharP ')') <|> ((:) <$> (wcharP ',' *> typeP) <*> tupleP) in tupleP))))
+  (Type_Tuple <$> Combos.between (wcharP '(') (wcharP ')') (many $ typeP))
 
 constP :: Parser Char Expression
 constP = do
@@ -384,7 +392,10 @@ declarationP = do
   varname <- wordP
   wcharP ':'
   t <- typeP
-  rhs <- wcharP '=' *> expressionP
+  rhs_maybe <- optional $ (wcharP '=' *> expressionP)
+  let rhs = case rhs_maybe of
+        Just r -> r
+        Nothing -> Exp_Empty
   return $ Exp_Declaration varname t rhs
 
 data OperatorLevel =

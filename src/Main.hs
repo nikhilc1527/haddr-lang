@@ -60,7 +60,8 @@ parse input_filepath str = do
         return $ e:rest_imported
 
 bssify :: (String, String) -> String
-bssify (str, name) = name ++ ": db " ++ (concat $ intersperse ", " $ (map (show . ord)) (str ++ "\0")) ++ "\n"
+-- bssify (str, name) = name ++ ": db " ++ (concat $ intersperse ", " $ (map (show . ord)) (str ++ "\0")) ++ "\n"
+bssify = uncurry (flip (++) . (": db " ++) . (++ "\n") . join . intersperse ", " . map (show . ord) . (++ "\n"))
 
 src_to_asm :: FilePath -> String -> IO String
 src_to_asm filepath input_str = do
@@ -91,9 +92,9 @@ runFileForever filepath = do
   nullfile <- openFile "/dev/null" ReadMode
   output <- hGetContents $ maybe nullfile id stdout_handle
   putStr output
-  -- removeFile "main"
-  -- removeFile "main.asm"
-  -- removeFile "main.o"
+  removeFile "main"
+  removeFile "main.asm"
+  removeFile "main.o"
 
 runFile :: FilePath -> IO ()
 runFile filepath = do
@@ -108,9 +109,9 @@ runFile filepath = do
   nullfile <- openFile "/dev/null" ReadMode
   output <- hGetContents $ maybe nullfile id stdout_handle
   putStr output
-  -- removeFile "main"
-  -- removeFile "main.asm"
-  -- removeFile "main.o"
+  removeFile "main"
+  removeFile "main.asm"
+  removeFile "main.o"
 
 compileFile :: FilePath -> IO ()
 compileFile filepath = do
@@ -141,6 +142,4 @@ main = do
   case head args of
     "-r" -> runFileForever $ head $ tail args
     file -> compileFile file
-  -- let file = head args
-  -- compileFile file
   return ()

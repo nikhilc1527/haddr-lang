@@ -1,0 +1,28 @@
+import "std.haddr";
+
+proc get_possibilities(vals: *i64, i: i64, money: i64) -> i64 {
+  if (money == 0) return 1;
+  let res: i64 = 0;
+  for (let j: i64 = i; j < 8 && vals[j] <= money; j = j + 1) {
+    money = money - vals[j];
+    res = res + get_possibilities(vals, j, money);
+    money = money + vals[j];
+  }
+  return res;
+}
+
+proc main() -> () {
+  puts("hello world");
+
+  let vals:[i64; 8] = 0;
+  vals[0] = 1;
+  vals[1] = 2;
+  vals[2] = 5;
+  vals[3] = 10;
+  vals[4] = 20;
+  vals[5] = 50;
+  vals[6] = 100;
+  vals[7] = 200;
+
+  printi(get_possibilities(vals, 0, 200));
+}
